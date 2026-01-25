@@ -1,0 +1,420 @@
+import { useState, useEffect } from 'react';
+import { useAuth, useNotifications } from '../../context';
+import { operatorAPI } from '../../services';
+import { formatCurrency, formatEnergy, formatDate } from '../../utils';
+import { Button, Select, LoadingSpinner } from '../../components';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import {
+  Download,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  DollarSign,
+  Users,
+  Clock,
+  FileText,
+} from 'lucide-react';
+
+const Reports = () => {
+  const { user } = useAuth();
+  const { showToast } = useNotifications();
+  
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState('week');
+  const [stats, setStats] = useState(null);
+
+  // Mock report data
+  const revenueData = [
+    { date: 'Mon', revenue: 245, sessions: 12 },
+    { date: 'Tue', revenue: 312, sessions: 15 },
+    { date: 'Wed', revenue: 287, sessions: 14 },
+    { date: 'Thu', revenue: 398, sessions: 18 },
+    { date: 'Fri', revenue: 421, sessions: 20 },
+    { date: 'Sat', revenue: 356, sessions: 17 },
+    { date: 'Sun', revenue: 289, sessions: 14 },
+  ];
+
+  const energyData = [
+    { date: 'Mon', energy: 156, peak: 42, offPeak: 114 },
+    { date: 'Tue', energy: 198, peak: 58, offPeak: 140 },
+    { date: 'Wed', energy: 175, peak: 48, offPeak: 127 },
+    { date: 'Thu', energy: 245, peak: 72, offPeak: 173 },
+    { date: 'Fri', energy: 267, peak: 85, offPeak: 182 },
+    { date: 'Sat', energy: 221, peak: 65, offPeak: 156 },
+    { date: 'Sun', energy: 189, peak: 52, offPeak: 137 },
+  ];
+
+  const utilizationData = [
+    { name: 'Downtown Hub', utilization: 78 },
+    { name: 'Mall Parking', utilization: 65 },
+    { name: 'Highway Rest', utilization: 82 },
+    { name: 'Tech Park', utilization: 71 },
+    { name: 'Airport', utilization: 89 },
+  ];
+
+  const portTypeData = [
+    { name: 'DC Fast (150kW)', value: 45, color: '#22c55e' },
+    { name: 'DC Fast (50kW)', value: 30, color: '#0ea5e9' },
+    { name: 'Level 2 (22kW)', value: 25, color: '#8b5cf6' },
+  ];
+
+  const peakHoursData = [
+    { hour: '6AM', sessions: 5 },
+    { hour: '8AM', sessions: 18 },
+    { hour: '10AM', sessions: 22 },
+    { hour: '12PM', sessions: 28 },
+    { hour: '2PM', sessions: 25 },
+    { hour: '4PM', sessions: 32 },
+    { hour: '6PM', sessions: 35 },
+    { hour: '8PM', sessions: 20 },
+    { hour: '10PM', sessions: 12 },
+  ];
+
+  useEffect(() => {
+    fetchStats();
+  }, [dateRange]);
+
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      const response = await operatorAPI.getStats(user.id);
+      setStats(response.data);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportReport = (type) => {
+    showToast({ type: 'success', message: `${type} report exported successfully!` });
+  };
+
+  const summaryStats = [
+    {
+      label: 'Total Revenue',
+      value: formatCurrency(2308),
+      change: '+12.5%',
+      trend: 'up',
+      icon: DollarSign,
+      color: 'bg-green-100 text-green-600',
+    },
+    {
+      label: 'Energy Delivered',
+      value: formatEnergy(1451),
+      change: '+8.3%',
+      trend: 'up',
+      icon: Zap,
+      color: 'bg-blue-100 text-blue-600',
+    },
+    {
+      label: 'Total Sessions',
+      value: '110',
+      change: '+15.2%',
+      trend: 'up',
+      icon: Users,
+      color: 'bg-purple-100 text-purple-600',
+    },
+    {
+      label: 'Avg Session Time',
+      value: '42 min',
+      change: '-5.1%',
+      trend: 'down',
+      icon: Clock,
+      color: 'bg-amber-100 text-amber-600',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900">Reports & Analytics</h1>
+          <p className="text-secondary-500 mt-1">Comprehensive performance insights</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            icon={Calendar}
+          >
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="quarter">This Quarter</option>
+            <option value="year">This Year</option>
+          </Select>
+          <Button icon={Download} onClick={() => handleExportReport('Full')}>
+            Export
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {summaryStats.map((stat) => (
+          <div key={stat.label} className="card">
+            <div className="flex items-start justify-between">
+              <div className={`p-3 rounded-xl ${stat.color}`}>
+                <stat.icon className="w-6 h-6" />
+              </div>
+              <div className={`flex items-center gap-1 text-sm font-medium ${
+                stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {stat.trend === 'up' ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )}
+                {stat.change}
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="text-2xl font-bold text-secondary-900">{stat.value}</p>
+              <p className="text-sm text-secondary-500">{stat.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Revenue Chart */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-secondary-900">Revenue Overview</h3>
+            <p className="text-sm text-secondary-500">Daily revenue and session count</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            icon={FileText}
+            onClick={() => handleExportReport('Revenue')}
+          >
+            Export
+          </Button>
+        </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+              <YAxis yAxisId="left" stroke="#64748b" fontSize={12} />
+              <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                }}
+              />
+              <Legend />
+              <Bar yAxisId="left" dataKey="revenue" name="Revenue ($)" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="right" dataKey="sessions" name="Sessions" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Energy and Peak Hours */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Energy Consumption */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900">Energy Consumption</h3>
+              <p className="text-sm text-secondary-500">Peak vs Off-Peak usage</p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              icon={FileText}
+              onClick={() => handleExportReport('Energy')}
+            >
+              Export
+            </Button>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={energyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="peak" name="Peak (kWh)" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="offPeak" name="Off-Peak (kWh)" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Peak Hours */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900">Peak Usage Hours</h3>
+              <p className="text-sm text-secondary-500">Sessions by time of day</p>
+            </div>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={peakHoursData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="hour" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="sessions" 
+                  name="Sessions" 
+                  stroke="#8b5cf6" 
+                  strokeWidth={3}
+                  dot={{ fill: '#8b5cf6', strokeWidth: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Utilization and Port Types */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Station Utilization */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900">Station Utilization</h3>
+              <p className="text-sm text-secondary-500">Average utilization by station</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {utilizationData.map((station) => (
+              <div key={station.name}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-secondary-700">{station.name}</span>
+                  <span className="text-sm font-semibold text-secondary-900">{station.utilization}%</span>
+                </div>
+                <div className="h-3 bg-secondary-100 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${
+                      station.utilization >= 80 ? 'bg-green-500' :
+                      station.utilization >= 60 ? 'bg-blue-500' :
+                      'bg-amber-500'
+                    }`}
+                    style={{ width: `${station.utilization}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Port Type Distribution */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900">Usage by Port Type</h3>
+              <p className="text-sm text-secondary-500">Session distribution</p>
+            </div>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={portTypeData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {portTypeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
+            {portTypeData.map((item) => (
+              <div key={item.name} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-sm text-secondary-600">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Export Options */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Export Reports</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { name: 'Revenue Report', desc: 'Financial summary' },
+            { name: 'Energy Report', desc: 'Consumption data' },
+            { name: 'Session Report', desc: 'Usage statistics' },
+            { name: 'Maintenance Log', desc: 'Service history' },
+          ].map((report) => (
+            <button
+              key={report.name}
+              onClick={() => handleExportReport(report.name)}
+              className="p-4 border-2 border-secondary-200 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <FileText className="w-5 h-5 text-primary-500" />
+                <span className="font-medium text-secondary-900">{report.name}</span>
+              </div>
+              <p className="text-sm text-secondary-500">{report.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Reports;

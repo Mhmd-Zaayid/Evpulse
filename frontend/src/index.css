@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply bg-secondary-50 text-secondary-900 font-sans antialiased m-0;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98];
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-100 hover:bg-secondary-200 text-secondary-700 font-medium py-2.5 px-5 rounded-xl transition-all duration-200;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-primary-500 text-primary-600 hover:bg-primary-50 font-medium py-2.5 px-5 rounded-xl transition-all duration-200;
+  }
+  
+  .card {
+    @apply bg-white rounded-2xl shadow-soft p-6 transition-all duration-200 hover:shadow-lg;
+  }
+  
+  .card-flat {
+    @apply bg-white rounded-2xl border border-secondary-200 p-6;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-secondary-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all duration-200 bg-white;
+  }
+  
+  .input-label {
+    @apply block text-sm font-medium text-secondary-700 mb-1.5;
+  }
+  
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-secondary-600 hover:bg-primary-50 hover:text-primary-600 transition-all duration-200;
+  }
+  
+  .sidebar-link-active {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-500 text-white shadow-md;
+  }
+  
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 text-green-700;
+  }
+  
+  .badge-warning {
+    @apply bg-amber-100 text-amber-700;
+  }
+  
+  .badge-danger {
+    @apply bg-red-100 text-red-700;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-700;
+  }
+  
+  .stat-card {
+    @apply card flex flex-col gap-3;
+  }
+  
+  .table-header {
+    @apply bg-secondary-50 text-secondary-600 text-sm font-semibold uppercase tracking-wider;
+  }
+  
+  .table-row {
+    @apply border-b border-secondary-100 hover:bg-secondary-50 transition-colors;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+  }
+  
+  .bg-gradient-primary {
+    @apply bg-gradient-to-br from-primary-500 to-primary-600;
+  }
+  
+  .glass {
+    @apply bg-white/80 backdrop-blur-lg;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+

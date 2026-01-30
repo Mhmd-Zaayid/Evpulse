@@ -10,3 +10,4 @@ export { default as ProgressBar } from './ProgressBar';
 export { default as LoadingSpinner, PageLoader } from './LoadingSpinner';
 export { default as Badge } from './Badge';
 export { default as EmptyState } from './EmptyState';
+export { default as StationRating, RatingDisplay, RatingSummary } from './StationRating';

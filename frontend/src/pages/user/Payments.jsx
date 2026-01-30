@@ -289,8 +289,8 @@ const Payments = () => {
         <div className="space-y-6">
           <div>
             <label className="input-label">Enter Amount</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-500 text-lg">$</span>
+              <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-500 text-lg">₹</span>
               <input
                 type="number"
                 value={topUpAmount}
@@ -314,7 +314,7 @@ const Payments = () => {
                       : 'border-secondary-200 hover:border-primary-300'
                   }`}
                 >
-                  ${amount}
+                  {formatCurrency(amount)}
                 </button>
               ))}
             </div>

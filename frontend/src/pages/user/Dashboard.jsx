@@ -1,328 +1,433 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context';
-import { formatCurrency } from '../../utils';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth, useNotifications } from '../../context';
+import { historyAPI, sessionsAPI, bookingsAPI, notificationsAPI } from '../../services';
+import { formatCurrency, formatDate, formatDuration, formatEnergy, formatRelativeTime } from '../../utils';
+import { Button, Badge, LoadingSpinner } from '../../components';
+import {
+  Zap,
+  MapPin,
+  Calendar,
+  Clock,
+  Battery,
+  TrendingUp,
+  ChevronRight,
+  Bell,
+  CreditCard,
+  History,
+  Navigation,
+  Star,
+  AlertCircle,
+  CheckCircle,
+  Leaf,
+  Car,
+} from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(11);
-  const [currentDate] = useState(new Date());
+  const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const [recentSessions, setRecentSessions] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const getDaysInMonth = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    return { firstDay, daysInMonth };
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user?.id]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [statsRes, activeRes, bookingsRes, historyRes, notifRes] = await Promise.all([
+        historyAPI.getStats(user?.id),
+        sessionsAPI.getActive(user?.id),
+        bookingsAPI.getByUser(user?.id),
+        historyAPI.getByUser(user?.id),
+        notificationsAPI.getByUser(user?.id),
+      ]);
+
+      if (statsRes.success) setStats(statsRes.data);
+      if (activeRes.success) setActiveSession(activeRes.data);
+      if (bookingsRes.success) setUpcomingBookings(bookingsRes.data.filter(b => b.status === 'confirmed'));
+      if (historyRes.success) setRecentSessions(historyRes.data.slice(0, 3));
+      if (notifRes.success) setNotifications(notifRes.data.filter(n => !n.read).slice(0, 4));
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getWeekDays = () => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  const activityData = [
-    [2, 3, 4, 3, 2, 1, 0],
-    [3, 4, 5, 4, 3, 2, 1],
-    [4, 5, 6, 5, 4, 3, 2],
-    [3, 4, 5, 6, 5, 4, 3],
-    [2, 3, 4, 5, 6, 5, 4],
-  ];
-
-  const getHeatmapColor = (value) => {
-    if (value === 0) return 'bg-gray-100';
-    if (value <= 2) return 'bg-green-200';
-    if (value <= 4) return 'bg-green-400';
-    return 'bg-green-600';
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'booking_confirmed':
+        return <Calendar className="w-5 h-5 text-green-500" />;
+      case 'charging_complete':
+        return <CheckCircle className="w-5 h-5 text-blue-500" />;
+      case 'payment_success':
+        return <CreditCard className="w-5 h-5 text-purple-500" />;
+      case 'reminder':
+        return <AlertCircle className="w-5 h-5 text-amber-500" />;
+      default:
+        return <Bell className="w-5 h-5 text-secondary-500" />;
+    }
   };
 
-  const { firstDay, daysInMonth } = getDaysInMonth();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-secondary-900">Hello, {user?.name?.split(' ')[0]}!</h1>
-          <p className="text-secondary-500 mt-1">Here's the overview for your business</p>
+          <h1 className="text-2xl font-bold text-secondary-900">
+            Welcome back, {user?.name?.split(' ')[0]}! 👋
+          </h1>
+          <p className="text-secondary-500 mt-1">
+            Here's your EV charging overview
+          </p>
         </div>
+        <Button icon={MapPin} onClick={() => navigate('/user/stations')}>
+          Find Stations
+        </Button>
       </div>
 
-      {/* Top Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Customers Card */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-          </div>
-          <div>
-            <p className="text-sm text-secondary-500 mb-2">Total Customers</p>
-            <p className="text-3xl font-bold text-secondary-900 mb-2">21,922</p>
-            <p className="text-sm text-green-600">+8% since last week</p>
-            <button className="flex items-center gap-1 text-sm text-secondary-600 mt-3 hover:text-primary-600 transition-colors">
-              View More <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* New Customers Card */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-          </div>
-          <div>
-            <p className="text-sm text-secondary-500 mb-2">New customers</p>
-            <p className="text-3xl font-bold text-secondary-900 mb-2">723</p>
-            <p className="text-sm text-green-600">+12% since last week</p>
-            <button className="flex items-center gap-1 text-sm text-secondary-600 mt-3 hover:text-primary-600 transition-colors">
-              View More <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Income Card */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-          </div>
-          <div>
-            <p className="text-sm text-secondary-500 mb-2">Income</p>
-            <p className="text-3xl font-bold text-secondary-900 mb-2">{formatCurrency(24291.92)}</p>
-            <p className="text-sm text-green-600">+23% since last week</p>
-            <button className="flex items-center gap-1 text-sm text-secondary-600 mt-3 hover:text-primary-600 transition-colors">
-              View More <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Expense Card */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-          </div>
-          <div>
-            <p className="text-sm text-secondary-500 mb-2">Expense</p>
-            <p className="text-3xl font-bold text-secondary-900 mb-2">{formatCurrency(4200.39)}</p>
-            <p className="text-sm text-green-600">+5% since last week</p>
-            <button className="flex items-center gap-1 text-sm text-secondary-600 mt-3 hover:text-primary-600 transition-colors">
-              View More <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Report - Takes 2 columns */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-secondary-900">Sales Report</h2>
-            <button className="text-secondary-400 hover:text-secondary-600">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Time Period Tabs */}
-          <div className="flex gap-4 mb-6">
-            <button className="text-secondary-900 font-medium border-b-2 border-primary-500 pb-2">Weekly</button>
-            <button className="text-secondary-400 pb-2 hover:text-secondary-700">Monthly</button>
-            <button className="text-secondary-400 pb-2 hover:text-secondary-700">Yearly</button>
-          </div>
-
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div>
-              <p className="text-3xl font-bold text-secondary-900">{formatCurrency(24291)}</p>
-              <p className="text-sm text-green-600 mt-1">+25.0%</p>
-              <p className="text-xs text-secondary-500 mt-1">Compared to {formatCurrency(19340)} last week</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-secondary-900">{formatCurrency(48903)}</p>
-              <p className="text-sm text-green-600 mt-1">+1.01%</p>
-              <p className="text-xs text-secondary-500 mt-1">Compared to {formatCurrency(48411)} last month</p>
-            </div>
-          </div>
-
-          {/* Chart Area */}
-          <div className="relative h-64 mb-4">
-            <svg viewBox="0 0 600 200" className="w-full h-full">
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 180 Q 150 150 200 120 T 400 100 L 600 80 L 600 200 L 0 200 Z"
-                fill="url(#gradient)"
-              />
-              <path
-                d="M 0 180 Q 150 150 200 120 T 400 100 L 600 80"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="3"
-              />
-              
-              {/* Data points */}
-              <circle cx="150" cy="150" r="4" fill="#22c55e" />
-              <circle cx="300" cy="110" r="4" fill="#22c55e" />
-              <circle cx="450" cy="95" r="4" fill="#22c55e" />
-              <circle cx="600" cy="80" r="4" fill="#22c55e" />
-              
-              {/* Labels */}
-              <text x="100" y="195" fontSize="12" fill="#64748b">3,021</text>
-              <text x="300" y="195" fontSize="12" fill="#64748b">12,222</text>
-              <text x="450" y="195" fontSize="12" fill="#64748b">50,201</text>
-              <text x="580" y="195" fontSize="12" fill="#64748b">82,229</text>
-            </svg>
-          </div>
-
-          {/* Bottom Stats */}
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-secondary-100">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-secondary-900">21,980</p>
-              <p className="text-sm text-secondary-500 mt-1">Week 1</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-secondary-900">50,201</p>
-              <p className="text-sm text-secondary-500 mt-1">Week 2</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-secondary-900">82,229</p>
-              <p className="text-sm text-secondary-500 mt-1">Week 3</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="space-y-6">
-          {/* Calendar Widget */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-secondary-900">This week</h3>
-              <div className="flex gap-2">
-                <button className="p-1 hover:bg-secondary-100 rounded transition-colors">
-                  <ChevronLeft className="w-4 h-4 text-secondary-600" />
-                </button>
-                <button className="p-1 hover:bg-secondary-100 rounded transition-colors">
-                  <ChevronRight className="w-4 h-4 text-secondary-600" />
-                </button>
+      {/* Active Charging Session Alert */}
+      {activeSession && (
+        <div className="bg-gradient-to-r from-primary-500 to-green-500 rounded-2xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                <Zap className="w-8 h-8" />
               </div>
-            </div>
-
-            {/* Week days header */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {getWeekDays().map((day) => (
-                <div key={day} className="text-center text-xs text-secondary-500 py-1">
-                  {day.slice(0, 3)}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {[...Array(firstDay)].map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square"></div>
-              ))}
-              {[...Array(daysInMonth)].map((_, i) => {
-                const day = i + 1;
-                const isSelected = day === selectedDate;
-                return (
-                  <button
-                    key={day}
-                    onClick={() => setSelectedDate(day)}
-                    className={`aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all ${
-                      isSelected
-                        ? 'bg-green-500 text-white shadow-md'
-                        : 'hover:bg-secondary-100 text-secondary-700'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Activity Heatmap */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-            <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-secondary-900">Activity heatmap</h3>
-                <p className="text-xs text-secondary-500">Sessions frequency of use</p>
+                <p className="text-white/80 text-sm">Currently Charging</p>
+                <h2 className="text-xl font-bold">GreenCharge Hub - Port #2</h2>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="flex items-center gap-1">
+                    <Battery className="w-4 h-4" />
+                    {activeSession.progress || 68}% Complete
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    ~12 min remaining
+                  </span>
+                </div>
               </div>
-              <button className="text-secondary-400 hover:text-secondary-600">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
+            </div>
+            <Button variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+              View Session
+            </Button>
+          </div>
+          <div className="mt-4">
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${activeSession.progress || 68}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-primary-600" />
+            </div>
+            <div>
+              <p className="text-sm text-secondary-500">Total Energy</p>
+              <p className="text-xl font-bold text-secondary-900">
+                {stats ? formatEnergy(stats.totalEnergy) : '0 kWh'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-sm text-green-600">
+            <TrendingUp className="w-4 h-4" />
+            <span>+12% this month</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <CreditCard className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-secondary-500">Total Spent</p>
+              <p className="text-xl font-bold text-secondary-900">
+                {stats ? formatCurrency(stats.totalCost) : formatCurrency(0)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-sm text-secondary-500">
+            <span>{stats?.totalSessions || 0} charging sessions</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <Leaf className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm text-secondary-500">CO₂ Saved</p>
+              <p className="text-xl font-bold text-secondary-900">
+                {stats ? `${stats.co2Saved} kg` : '0 kg'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-sm text-emerald-600">
+            <span>🌱 Great for the planet!</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-secondary-500">Avg. Session</p>
+              <p className="text-xl font-bold text-secondary-900">
+                {stats ? formatDuration(stats.avgSessionDuration) : '0 min'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-1 text-sm text-secondary-500">
+            <span>Per charging session</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content Area */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Vehicle Info Card */}
+          {user?.vehicle && (
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-secondary-900">Your Vehicle</h2>
+                <Button variant="outline" size="sm" onClick={() => navigate('/user/settings')}>
+                  Edit
+                </Button>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-secondary-100 rounded-2xl flex items-center justify-center">
+                  <Car className="w-10 h-10 text-secondary-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-secondary-900">
+                    {user.vehicle.make} {user.vehicle.model}
+                  </h3>
+                  <div className="flex items-center gap-6 mt-2 text-sm text-secondary-500">
+                    <span className="flex items-center gap-1">
+                      <Battery className="w-4 h-4" />
+                      {user.vehicle.batteryCapacity} kWh Battery
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Navigation className="w-4 h-4" />
+                      {user.vehicle.range} km Range
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Bookings */}
+          <div className="bg-white rounded-2xl shadow-sm border border-secondary-100 overflow-hidden">
+            <div className="p-6 border-b border-secondary-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-secondary-900">Upcoming Bookings</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/user/bookings')}>
+                View All <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+            {upcomingBookings.length > 0 ? (
+              <div className="divide-y divide-secondary-100">
+                {upcomingBookings.map((booking) => (
+                  <div key={booking.id} className="p-4 hover:bg-secondary-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                          <Calendar className="w-6 h-6 text-primary-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-secondary-900">
+                            Station #{booking.stationId}
+                          </h3>
+                          <p className="text-sm text-secondary-500">
+                            {formatDate(booking.date)} • {booking.timeSlot}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="success">{booking.status}</Badge>
+                        <p className="text-sm text-secondary-500 mt-1">
+                          {booking.chargingType}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <Calendar className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
+                <p className="text-secondary-500">No upcoming bookings</p>
+                <Button variant="outline" className="mt-4" onClick={() => navigate('/user/stations')}>
+                  Book a Charging Slot
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Sessions */}
+          <div className="bg-white rounded-2xl shadow-sm border border-secondary-100 overflow-hidden">
+            <div className="p-6 border-b border-secondary-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-secondary-900">Recent Sessions</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/user/history')}>
+                View All <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+            {recentSessions.length > 0 ? (
+              <div className="divide-y divide-secondary-100">
+                {recentSessions.map((session) => (
+                  <div key={session.id} className="p-4 hover:bg-secondary-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          session.chargingType === 'Fast DC' ? 'bg-amber-100' : 'bg-blue-100'
+                        }`}>
+                          <Zap className={`w-6 h-6 ${
+                            session.chargingType === 'Fast DC' ? 'text-amber-600' : 'text-blue-600'
+                          }`} />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-secondary-900">{session.stationName}</h3>
+                          <p className="text-sm text-secondary-500">
+                            {formatDate(session.date)} • {formatDuration(session.duration)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary-600">{formatCurrency(session.cost)}</p>
+                        <p className="text-sm text-secondary-500">{session.energyConsumed} kWh</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <History className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
+                <p className="text-secondary-500">No charging history yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Notifications */}
+          <div className="bg-white rounded-2xl shadow-sm border border-secondary-100 overflow-hidden">
+            <div className="p-4 border-b border-secondary-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-secondary-900">Notifications</h2>
+              {notifications.length > 0 && (
+                <Badge variant="danger">{notifications.length}</Badge>
+              )}
+            </div>
+            {notifications.length > 0 ? (
+              <div className="divide-y divide-secondary-100">
+                {notifications.map((notif) => (
+                  <div key={notif.id} className="p-4 hover:bg-secondary-50 transition-colors cursor-pointer">
+                    <div className="flex gap-3">
+                      {getNotificationIcon(notif.type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-secondary-900">{notif.title}</p>
+                        <p className="text-xs text-secondary-500 truncate mt-0.5">
+                          {notif.message}
+                        </p>
+                        <p className="text-xs text-secondary-400 mt-1">
+                          {formatRelativeTime(notif.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center">
+                <Bell className="w-10 h-10 text-secondary-300 mx-auto mb-2" />
+                <p className="text-sm text-secondary-500">No new notifications</p>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
+            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Quick Actions</h2>
+            <div className="space-y-3">
+              <button 
+                onClick={() => navigate('/user/stations')}
+                className="w-full flex items-center gap-3 p-3 bg-secondary-50 rounded-xl hover:bg-secondary-100 transition-colors"
+              >
+                <MapPin className="w-5 h-5 text-primary-500" />
+                <span className="text-secondary-700">Find Nearby Stations</span>
               </button>
-            </div>
-
-            {/* Week days header */}
-            <div className="grid grid-cols-7 gap-2 mb-2">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                <div key={day} className="text-center text-xs text-secondary-500">
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Heatmap grid */}
-            <div className="space-y-2">
-              {activityData.map((week, weekIndex) => (
-                <div key={weekIndex} className="grid grid-cols-7 gap-2">
-                  {week.map((value, dayIndex) => (
-                    <div
-                      key={dayIndex}
-                      className={`aspect-square rounded transition-colors ${getHeatmapColor(value)}`}
-                      title={`${value} sessions`}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-secondary-100">
-              <div className="flex items-center gap-2 text-xs text-secondary-500">
-                <span>0-99</span>
-                <span>100-249</span>
-                <span>250-399</span>
-                <span>400+</span>
-              </div>
+              <button 
+                onClick={() => navigate('/user/bookings')}
+                className="w-full flex items-center gap-3 p-3 bg-secondary-50 rounded-xl hover:bg-secondary-100 transition-colors"
+              >
+                <Calendar className="w-5 h-5 text-primary-500" />
+                <span className="text-secondary-700">My Bookings</span>
+              </button>
+              <button 
+                onClick={() => navigate('/user/history')}
+                className="w-full flex items-center gap-3 p-3 bg-secondary-50 rounded-xl hover:bg-secondary-100 transition-colors"
+              >
+                <History className="w-5 h-5 text-primary-500" />
+                <span className="text-secondary-700">Charging History</span>
+              </button>
+              <button 
+                onClick={() => navigate('/user/payments')}
+                className="w-full flex items-center gap-3 p-3 bg-secondary-50 rounded-xl hover:bg-secondary-100 transition-colors"
+              >
+                <CreditCard className="w-5 h-5 text-primary-500" />
+                <span className="text-secondary-700">Payment Methods</span>
+              </button>
             </div>
           </div>
 
-          {/* Conversion Stats */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-secondary-900">Conversion</h3>
-              <button className="text-secondary-400 hover:text-secondary-600">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              </button>
+          {/* Eco Impact */}
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-6 text-white">
+            <div className="flex items-center gap-3 mb-4">
+              <Leaf className="w-8 h-8" />
+              <h2 className="text-lg font-semibold">Your Eco Impact</h2>
             </div>
-
             <div className="space-y-4">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-secondary-600">Active stations</span>
-                  <span className="text-sm font-medium text-secondary-900">85%</span>
-                </div>
-                <div className="h-2 bg-secondary-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: '85%' }}></div>
-                </div>
+                <p className="text-white/80 text-sm">CO₂ Emissions Saved</p>
+                <p className="text-2xl font-bold">{stats?.co2Saved || 0} kg</p>
               </div>
-
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-secondary-600">Passive stations</span>
-                  <span className="text-sm font-medium text-secondary-900">42%</span>
-                </div>
-                <div className="h-2 bg-secondary-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: '42%' }}></div>
-                </div>
+                <p className="text-white/80 text-sm">Equivalent to</p>
+                <p className="text-lg font-semibold">
+                  🌳 {Math.round((stats?.co2Saved || 0) / 21)} trees planted
+                </p>
               </div>
+              <p className="text-white/70 text-xs">
+                Thank you for choosing electric! Every charge helps the planet.
+              </p>
             </div>
           </div>
         </div>

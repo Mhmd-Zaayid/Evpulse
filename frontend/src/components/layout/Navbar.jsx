@@ -46,7 +46,8 @@ const Navbar = ({ onMenuClick }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    // Use full page redirect to bypass React Router's protected route checks
+    window.location.href = '/';
   };
 
   const getNotificationIcon = (type) => {

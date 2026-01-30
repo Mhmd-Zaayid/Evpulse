@@ -16,6 +16,7 @@ import {
   Bookings,
   Payments,
   Settings as UserSettings,
+  ChargingHistory,
 } from './pages/user';
 
 // Operator Pages
@@ -23,6 +24,7 @@ import {
   Dashboard as OperatorDashboard,
   Stations as OperatorStations,
   Sessions as OperatorSessions,
+  Feedback as OperatorFeedback,
   Maintenance,
   Reports as OperatorReports,
   Settings as OperatorSettings,
@@ -33,6 +35,7 @@ import {
   Dashboard as AdminDashboard,
   Users,
   Stations as AdminStations,
+  Feedback as AdminFeedback,
   Transactions,
   Reports as AdminReports,
   Settings as AdminSettings,
@@ -55,7 +58,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     } else if (user?.role === 'operator') {
       return <Navigate to="/operator" replace />;
     } else {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/user/dashboard" replace />;
     }
   }
   
@@ -73,7 +76,7 @@ const PublicRoute = ({ children }) => {
     } else if (user?.role === 'operator') {
       return <Navigate to="/operator" replace />;
     } else {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/user/dashboard" replace />;
     }
   }
   
@@ -104,7 +107,7 @@ const AppRoutes = () => {
 
       {/* User Routes */}
       <Route
-        path="/dashboard"
+        path="/user/dashboard"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -114,7 +117,11 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/stations"
+        path="/dashboard"
+        element={<Navigate to="/user/dashboard" replace />}
+      />
+      <Route
+        path="/user/stations"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -124,7 +131,11 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/stations/:id"
+        path="/stations"
+        element={<Navigate to="/user/stations" replace />}
+      />
+      <Route
+        path="/user/stations/:id"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -134,7 +145,11 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/bookings"
+        path="/stations/:id"
+        element={<Navigate to="/user/stations/:id" replace />}
+      />
+      <Route
+        path="/user/bookings"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -144,7 +159,21 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/payments"
+        path="/bookings"
+        element={<Navigate to="/user/bookings" replace />}
+      />
+      <Route
+        path="/user/history"
+        element={
+          <ProtectedRoute allowedRoles={['user']}>
+            <DashboardLayout>
+              <ChargingHistory />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/user/payments"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -154,7 +183,11 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/settings"
+        path="/payments"
+        element={<Navigate to="/user/payments" replace />}
+      />
+      <Route
+        path="/user/settings"
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <DashboardLayout>
@@ -162,6 +195,10 @@ const AppRoutes = () => {
             </DashboardLayout>
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/settings"
+        element={<Navigate to="/user/settings" replace />}
       />
 
       {/* Operator Routes */}
@@ -191,6 +228,16 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['operator']}>
             <DashboardLayout>
               <OperatorSessions />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/operator/feedback"
+        element={
+          <ProtectedRoute allowedRoles={['operator']}>
+            <DashboardLayout>
+              <OperatorFeedback />
             </DashboardLayout>
           </ProtectedRoute>
         }
@@ -253,6 +300,16 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['admin']}>
             <DashboardLayout>
               <AdminStations />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/feedback"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DashboardLayout>
+              <AdminFeedback />
             </DashboardLayout>
           </ProtectedRoute>
         }

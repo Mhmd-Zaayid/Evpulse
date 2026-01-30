@@ -1,4 +1,4 @@
-import { users, chargingStations, chargingSessions, bookings, transactions, adminStats, operatorStats, availableTimeSlots } from './mockData';
+import { users, chargingStations, chargingSessions, bookings, transactions, adminStats, operatorStats, availableTimeSlots, stationReviews, chargingHistory, userNotifications, operatorFeedback, adminFeedbackStats } from './mockData';
 
 // Simulate API delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -245,4 +245,107 @@ export const operatorAPI = {
     await delay(500);
     return { success: true, message: 'Alert resolved' };
   },
+
+  getFeedback: async (operatorId) => {
+    await delay(400);
+    return { success: true, data: operatorFeedback };
+  },
 };
+
+// Reviews API
+export const reviewsAPI = {
+  getByStation: async (stationId) => {
+    await delay(400);
+    const reviews = stationReviews.filter(r => r.stationId === parseInt(stationId));
+    return { success: true, data: reviews };
+  },
+
+  create: async (reviewData) => {
+    await delay(600);
+    const newReview = {
+      id: stationReviews.length + 1,
+      ...reviewData,
+      timestamp: new Date().toISOString(),
+      helpful: 0,
+    };
+    return { success: true, data: newReview };
+  },
+
+  getByUser: async (userId) => {
+    await delay(400);
+    const reviews = stationReviews.filter(r => r.userId === userId);
+    return { success: true, data: reviews };
+  },
+};
+
+// Charging History API
+export const historyAPI = {
+  getByUser: async (userId) => {
+    await delay(400);
+    const history = chargingHistory.filter(h => h.userId === userId);
+    return { success: true, data: history };
+  },
+
+  getStats: async (userId) => {
+    await delay(300);
+    const history = chargingHistory.filter(h => h.userId === userId);
+    const totalEnergy = history.reduce((sum, h) => sum + h.energyConsumed, 0);
+    const totalCost = history.reduce((sum, h) => sum + h.cost, 0);
+    const totalSessions = history.length;
+    const avgSessionDuration = history.reduce((sum, h) => sum + h.duration, 0) / totalSessions;
+    
+    return {
+      success: true,
+      data: {
+        totalEnergy: Math.round(totalEnergy * 10) / 10,
+        totalCost: Math.round(totalCost * 100) / 100,
+        totalSessions,
+        avgSessionDuration: Math.round(avgSessionDuration),
+        co2Saved: Math.round(totalEnergy * 0.4 * 10) / 10, // kg CO2 saved
+      },
+    };
+  },
+};
+
+// User Notifications API
+export const notificationsAPI = {
+  getByUser: async (userId) => {
+    await delay(300);
+    const notifications = userNotifications.filter(n => n.userId === userId);
+    return { success: true, data: notifications };
+  },
+
+  markAsRead: async (notificationId) => {
+    await delay(200);
+    return { success: true, message: 'Notification marked as read' };
+  },
+
+  markAllAsRead: async (userId) => {
+    await delay(300);
+    return { success: true, message: 'All notifications marked as read' };
+  },
+};
+
+// Admin Feedback API
+export const adminFeedbackAPI = {
+  getStats: async () => {
+    await delay(400);
+    return { success: true, data: adminFeedbackStats };
+  },
+
+  getAllReviews: async (filters = {}) => {
+    await delay(500);
+    let reviews = [...stationReviews];
+    
+    if (filters.rating) {
+      reviews = reviews.filter(r => r.rating === filters.rating);
+    }
+    
+    if (filters.stationId) {
+      reviews = reviews.filter(r => r.stationId === filters.stationId);
+    }
+    
+    return { success: true, data: reviews };
+  },
+};
+

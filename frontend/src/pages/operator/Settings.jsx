@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth, useNotifications } from '../../context';
 import { Button, Input, Select, Modal, LoadingSpinner } from '../../components';
+import { formatCurrency } from '../../utils';
 import {
   User,
   Building2,
@@ -162,7 +163,7 @@ const Settings = () => {
   const renderProfileSettings = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Personal Information</h3>
+        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Profile</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Full Name"
@@ -172,7 +173,6 @@ const Settings = () => {
           />
           <Input
             label="Email Address"
-            type="email"
             value={profile.email}
             onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
             icon={Mail}
@@ -508,9 +508,9 @@ const Settings = () => {
         <h3 className="text-lg font-semibold text-secondary-900 mb-4">Billing History</h3>
         <div className="space-y-2">
           {[
-            { date: 'Jan 1, 2026', amount: '$299.00', status: 'Paid' },
-            { date: 'Dec 1, 2025', amount: '$299.00', status: 'Paid' },
-            { date: 'Nov 1, 2025', amount: '$299.00', status: 'Paid' },
+            { date: 'Jan 1, 2026', amount: formatCurrency(299), status: 'Paid' },
+            { date: 'Dec 1, 2025', amount: formatCurrency(299), status: 'Paid' },
+            { date: 'Nov 1, 2025', amount: formatCurrency(299), status: 'Paid' },
           ].map((invoice, i) => (
             <div key={i} className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
               <div>

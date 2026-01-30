@@ -88,7 +88,7 @@ const Dashboard = () => {
   const recentActivity = [
     { type: 'user', message: 'New user registered: John Smith', time: '5 min ago' },
     { type: 'station', message: 'Station #45 went offline', time: '12 min ago' },
-    { type: 'payment', message: 'Large transaction: $245.00', time: '25 min ago' },
+    { type: 'payment', message: `Large transaction: ${formatCurrency(245)}`, time: '25 min ago' },
     { type: 'operator', message: 'New operator approved: GreenCharge Inc', time: '1 hour ago' },
     { type: 'alert', message: 'Maintenance scheduled for Station #12', time: '2 hours ago' },
   ];

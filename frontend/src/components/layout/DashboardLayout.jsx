@@ -5,7 +5,7 @@ import Navbar from './Navbar';
 import Toast from '../ui/Toast';
 import { useNotifications } from '../../context';
 
-const DashboardLayout = () => {
+const DashboardLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toasts, removeToast } = useNotifications();
 
@@ -26,7 +26,7 @@ const DashboardLayout = () => {
       <div className="lg:pl-64 min-h-screen transition-all duration-300 flex flex-col">
         <Navbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
         <main className="flex-1 w-full h-full">
-          <Outlet />
+          {children ?? <Outlet />}
         </main>
       </div>
 

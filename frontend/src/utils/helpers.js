@@ -1,9 +1,10 @@
 // Format currency
-export const formatCurrency = (amount, currency = 'USD') => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrency = (amount, currency = 'INR') => {
+  const num = Number(amount) || 0;
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: currency,
-  }).format(amount);
+    currency,
+  }).format(num);
 };
 
 // Format number with thousands separator

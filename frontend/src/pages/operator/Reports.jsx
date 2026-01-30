@@ -231,7 +231,7 @@ const Reports = () => {
                 }}
               />
               <Legend />
-              <Bar yAxisId="left" dataKey="revenue" name="Revenue ($)" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="left" dataKey="revenue" name="Revenue (₹)" fill="#22c55e" radius={[4, 4, 0, 0]} />
               <Bar yAxisId="right" dataKey="sessions" name="Sessions" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

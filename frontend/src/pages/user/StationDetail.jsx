@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { stationsAPI, bookingsAPI } from '../../services';
+import { stationsAPI, bookingsAPI, reviewsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
 import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime } from '../../utils';
-import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar } from '../../components';
-import { useNotifications } from '../../context';
+import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
+import { useNotifications, useAuth } from '../../context';
 import {
   ArrowLeft,
   MapPin,
@@ -19,20 +19,37 @@ import {
   Play,
   ChevronRight,
   Check,
+  Brain,
+  Timer,
+  AlertCircle,
+  Battery,
+  TrendingUp,
+  Info,
+  MessageSquare,
 } from 'lucide-react';
 
 const StationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useNotifications();
+  const { user } = useAuth();
   
   const [station, setStation] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPort, setSelectedPort] = useState(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showChargingModal, setShowChargingModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
   const [chargingProgress, setChargingProgress] = useState(0);
+  
+  // AI-based states
+  const [currentBattery, setCurrentBattery] = useState(35);
+  const [targetBattery, setTargetBattery] = useState(80);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [slotEstimate, setSlotEstimate] = useState(null);
+  const [waitTimeEstimate, setWaitTimeEstimate] = useState(null);
   
   const [bookingData, setBookingData] = useState({
     date: '',
@@ -43,7 +60,15 @@ const StationDetail = () => {
 
   useEffect(() => {
     fetchStationDetails();
+    fetchReviews();
   }, [id]);
+
+  // Update AI recommendations when battery level changes
+  useEffect(() => {
+    if (station) {
+      updateAiRecommendations();
+    }
+  }, [currentBattery, targetBattery, station]);
 
   const fetchStationDetails = async () => {
     try {
@@ -56,6 +81,36 @@ const StationDetail = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const response = await reviewsAPI.getByStation(id);
+      if (response.success) {
+        setReviews(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+    }
+  };
+
+  const updateAiRecommendations = () => {
+    // Get smart charger recommendation
+    const recommendation = getSmartChargerRecommendation(currentBattery, 60);
+    setAiRecommendation(recommendation);
+
+    // Get slot duration estimate
+    const vehicleType = user?.vehicle?.make && user?.vehicle?.model 
+      ? `${user.vehicle.make} ${user.vehicle.model}` 
+      : 'default';
+    const estimate = estimateSlotDuration(vehicleType, currentBattery, targetBattery, recommendation.type);
+    setSlotEstimate(estimate);
+
+    // Get waiting time estimate
+    const busyPorts = station?.ports.filter(p => p.status === 'busy').length || 0;
+    const totalPorts = station?.ports.length || 4;
+    const waitTime = estimateWaitingTime(station?.id, 0, busyPorts, totalPorts);
+    setWaitTimeEstimate(waitTime);
   };
 
   const handlePortSelect = (port) => {
@@ -100,6 +155,23 @@ const StationDetail = () => {
     setChargingProgress(0);
     setShowChargingModal(false);
     showToast({ type: 'success', message: 'Charging session completed!' });
+    // Show rating modal after charging completes
+    setTimeout(() => setShowRatingModal(true), 500);
+  };
+
+  const handleRatingSubmit = async (ratingData) => {
+    try {
+      await reviewsAPI.create({
+        stationId: parseInt(id),
+        userId: user?.id,
+        userName: user?.name,
+        ...ratingData,
+      });
+      showToast({ type: 'success', message: 'Thank you for your feedback!' });
+      fetchReviews();
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to submit rating' });
+    }
   };
 
   const fetchAvailableSlots = async (date) => {
@@ -215,6 +287,102 @@ const StationDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* AI Smart Recommendations Card */}
+          <div className="card bg-gradient-to-br from-primary-50 to-blue-50 border-primary-200">
+            <div className="flex items-center gap-2 mb-4">
+              <Brain className="w-5 h-5 text-primary-600" />
+              <h2 className="text-lg font-semibold text-secondary-900">AI Smart Recommendations</h2>
+              <Badge variant="info" size="sm">AI Powered</Badge>
+            </div>
+
+            {/* Battery Level Input */}
+            <div className="mb-4 p-4 bg-white/60 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-secondary-700">Your Current Battery</span>
+                <span className="text-lg font-bold text-primary-600">{currentBattery}%</span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="95"
+                value={currentBattery}
+                onChange={(e) => setCurrentBattery(parseInt(e.target.value))}
+                className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer accent-primary-500"
+              />
+              <div className="flex justify-between text-xs text-secondary-500 mt-1">
+                <span>5%</span>
+                <span>Target: {targetBattery}%</span>
+                <span>95%</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Charger Recommendation */}
+              {aiRecommendation && (
+                <div className="p-4 bg-white rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className={`w-5 h-5 ${aiRecommendation.type === 'Fast DC' ? 'text-amber-500' : 'text-blue-500'}`} />
+                    <span className="text-sm font-medium text-secondary-700">Recommended</span>
+                  </div>
+                  <p className="text-lg font-bold text-secondary-900">{aiRecommendation.type}</p>
+                  <p className="text-xs text-secondary-500 mt-1">{aiRecommendation.reason}</p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                    <span className="text-xs text-green-600">{aiRecommendation.confidence}% confidence</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Slot Duration Estimate */}
+              {slotEstimate && (
+                <div className="p-4 bg-white rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Timer className="w-5 h-5 text-purple-500" />
+                    <span className="text-sm font-medium text-secondary-700">Est. Duration</span>
+                  </div>
+                  <p className="text-lg font-bold text-secondary-900">{slotEstimate.recommendedSlotDuration} min</p>
+                  <p className="text-xs text-secondary-500 mt-1">
+                    {slotEstimate.energyRequired} kWh needed
+                  </p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <Battery className="w-3 h-3 text-primary-500" />
+                    <span className="text-xs text-secondary-600">{currentBattery}% → {targetBattery}%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Waiting Time Estimate */}
+              {waitTimeEstimate && (
+                <div className="p-4 bg-white rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className={`w-5 h-5 ${
+                      waitTimeEstimate.status === 'high' ? 'text-red-500' : 
+                      waitTimeEstimate.status === 'medium' ? 'text-amber-500' : 'text-green-500'
+                    }`} />
+                    <span className="text-sm font-medium text-secondary-700">Wait Time</span>
+                  </div>
+                  <p className="text-lg font-bold text-secondary-900">
+                    {waitTimeEstimate.estimatedWaitMinutes === 0 
+                      ? 'No wait' 
+                      : `~${waitTimeEstimate.estimatedWaitMinutes} min`}
+                  </p>
+                  <p className="text-xs text-secondary-500 mt-1">{waitTimeEstimate.statusText}</p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <Info className="w-3 h-3 text-blue-500" />
+                    <span className="text-xs text-secondary-600">{waitTimeEstimate.availablePorts} ports available</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {waitTimeEstimate && waitTimeEstimate.estimatedWaitMinutes > 15 && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">{waitTimeEstimate.recommendation}</p>
+              </div>
+            )}
+          </div>
+
           {/* Charging Ports */}
           <div className="card">
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Charging Ports</h2>
@@ -311,6 +479,56 @@ const StationDetail = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Reviews Section */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-secondary-900">Reviews & Ratings</h2>
+              <RatingDisplay rating={station.rating} totalReviews={station.totalReviews} />
+            </div>
+            
+            {reviews.length > 0 ? (
+              <div className="space-y-4">
+                {reviews.slice(0, 3).map((review) => (
+                  <div key={review.id} className="p-4 bg-secondary-50 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                          <span className="text-primary-700 font-medium text-sm">
+                            {review.userName?.charAt(0)}
+                          </span>
+                        </div>
+                        <span className="font-medium text-secondary-900">{review.userName}</span>
+                      </div>
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${
+                              star <= review.rating
+                                ? 'text-amber-400 fill-amber-400'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-sm text-secondary-600">{review.comment}</p>
+                  </div>
+                ))}
+                {reviews.length > 3 && (
+                  <Button variant="outline" fullWidth icon={MessageSquare}>
+                    View All {reviews.length} Reviews
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <MessageSquare className="w-10 h-10 text-secondary-300 mx-auto mb-2" />
+                <p className="text-secondary-500">No reviews yet</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -536,6 +754,15 @@ const StationDetail = () => {
           )}
         </div>
       </Modal>
+
+      {/* Rating Modal */}
+      <StationRating
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        stationName={station?.name}
+        sessionId={Date.now()}
+        onSubmit={handleRatingSubmit}
+      />
     </div>
   );
 };

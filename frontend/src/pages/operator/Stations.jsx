@@ -267,14 +267,14 @@ const Stations = () => {
             <h4 className="font-medium text-secondary-900 mb-3">Normal AC Charging</h4>
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Base Rate ($/kWh)"
+                label="Base Rate (₹/kWh)"
                 type="number"
                 step="0.01"
                 value={pricingData.normalBase}
                 onChange={(e) => setPricingData(prev => ({ ...prev, normalBase: e.target.value }))}
               />
               <Input
-                label="Peak Rate ($/kWh)"
+                label="Peak Rate (₹/kWh)"
                 type="number"
                 step="0.01"
                 value={pricingData.normalPeak}
@@ -287,14 +287,14 @@ const Stations = () => {
             <h4 className="font-medium text-secondary-900 mb-3">Fast DC Charging</h4>
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Base Rate ($/kWh)"
+                label="Base Rate (₹/kWh)"
                 type="number"
                 step="0.01"
                 value={pricingData.fastBase}
                 onChange={(e) => setPricingData(prev => ({ ...prev, fastBase: e.target.value }))}
               />
               <Input
-                label="Peak Rate ($/kWh)"
+                label="Peak Rate (₹/kWh)"
                 type="number"
                 step="0.01"
                 value={pricingData.fastPeak}

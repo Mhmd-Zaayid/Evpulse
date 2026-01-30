@@ -189,7 +189,7 @@ const Sessions = () => {
         <div className="card">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <span className="text-purple-600 font-bold">$</span>
+              <span className="text-purple-600 font-bold">₹</span>
             </div>
             <div>
               <p className="text-2xl font-bold text-secondary-900">{formatCurrency(totalRevenue)}</p>

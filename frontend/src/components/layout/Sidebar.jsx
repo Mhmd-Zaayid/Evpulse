@@ -26,13 +26,15 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    // Use full page redirect to bypass React Router's protected route checks
+    window.location.href = '/';
   };
 
   const userLinks = [
     { to: '/user/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/user/stations', icon: MapPin, label: 'Find Stations' },
     { to: '/user/bookings', icon: Calendar, label: 'My Bookings' },
+    { to: '/user/history', icon: Zap, label: 'Charging History' },
     { to: '/user/payments', icon: CreditCard, label: 'Payments' },
     { to: '/user/settings', icon: Settings, label: 'Settings' },
   ];
@@ -41,6 +43,7 @@ const Sidebar = () => {
     { to: '/operator/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/operator/stations', icon: Building2, label: 'My Stations' },
     { to: '/operator/sessions', icon: Zap, label: 'Sessions' },
+    { to: '/operator/feedback', icon: BarChart3, label: 'Feedback' },
     { to: '/operator/maintenance', icon: Wrench, label: 'Maintenance' },
     { to: '/operator/reports', icon: FileText, label: 'Reports' },
     { to: '/operator/settings', icon: Settings, label: 'Settings' },
@@ -49,10 +52,10 @@ const Sidebar = () => {
   const adminLinks = [
     { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/admin/users', icon: Users, label: 'Users' },
-    { to: '/admin/operators', icon: Building2, label: 'Operators' },
     { to: '/admin/stations', icon: MapPin, label: 'Stations' },
-    { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
-    { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
+    { to: '/admin/feedback', icon: BarChart3, label: 'Feedback' },
+    { to: '/admin/transactions', icon: CreditCard, label: 'Transactions' },
+    { to: '/admin/reports', icon: FileText, label: 'Reports' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 

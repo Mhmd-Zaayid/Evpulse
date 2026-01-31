@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth, useNotifications } from '../../context';
 import { Button, Input } from '../../components';
-import { User, Mail, Phone, Car, Bell, Shield, Save, Camera } from 'lucide-react';
+import { User, Mail, Phone, Car, Bell, Shield, Save, Camera, X } from 'lucide-react';
 
 const Settings = () => {
   const { user, updateUser } = useAuth();
   const { showToast } = useNotifications();
+  const fileInputRef = useRef(null);
   
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
+  const [profileImage, setProfileImage] = useState(user?.profileImage || null);
   
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
@@ -32,6 +34,39 @@ const Settings = () => {
     setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showToast({ type: 'error', message: 'Please select an image file' });
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast({ type: 'error', message: 'Image size should be less than 5MB' });
+        return;
+      }
+      
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setProfileImage(event.target?.result);
+        showToast({ type: 'success', message: 'Profile image updated!' });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setProfileImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    showToast({ type: 'info', message: 'Profile image removed' });
+  };
+
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
@@ -39,6 +74,7 @@ const Settings = () => {
       updateUser({
         name: profileData.name,
         phone: profileData.phone,
+        profileImage: profileImage,
         vehicle: {
           make: profileData.vehicleMake,
           model: profileData.vehicleModel,
@@ -100,19 +136,47 @@ const Settings = () => {
               
               {/* Avatar */}
               <div className="flex items-center gap-4 mb-6 pb-6 border-b border-secondary-100">
-                <div className="relative">
-                  <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-bold text-primary-700">
-                      {user?.name?.charAt(0) || 'U'}
-                    </span>
-                  </div>
-                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary-600 transition-colors">
+                <div className="relative group">
+                  {profileImage ? (
+                    <img 
+                      src={profileImage} 
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover ring-4 ring-primary-100"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center">
+                      <span className="text-2xl font-bold text-primary-700">
+                        {user?.name?.charAt(0) || 'U'}
+                      </span>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="profile-image-upload"
+                  />
+                  <label 
+                    htmlFor="profile-image-upload"
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary-600 transition-colors cursor-pointer"
+                  >
                     <Camera className="w-4 h-4" />
-                  </button>
+                  </label>
+                  {profileImage && (
+                    <button 
+                      onClick={handleRemoveImage}
+                      className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
                 <div>
                   <p className="font-medium text-secondary-900">{user?.name}</p>
                   <p className="text-sm text-secondary-500">{user?.email}</p>
+                  <p className="text-xs text-secondary-400 mt-1">Click camera icon to upload photo</p>
                 </div>
               </div>
 

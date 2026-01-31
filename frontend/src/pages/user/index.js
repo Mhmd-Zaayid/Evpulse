@@ -5,3 +5,4 @@ export { default as Bookings } from './Bookings';
 export { default as Payments } from './Payments';
 export { default as Settings } from './Settings';
 export { default as ChargingHistory } from './ChargingHistory';
+export { default as HelpSupport } from './HelpSupport';

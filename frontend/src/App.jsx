@@ -17,6 +17,7 @@ import {
   Payments,
   Settings as UserSettings,
   ChargingHistory,
+  HelpSupport,
 } from './pages/user';
 
 // Operator Pages
@@ -200,6 +201,16 @@ const AppRoutes = () => {
         path="/settings"
         element={<Navigate to="/user/settings" replace />}
       />
+      <Route
+        path="/user/help"
+        element={
+          <ProtectedRoute allowedRoles={['user']}>
+            <DashboardLayout>
+              <HelpSupport />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Operator Routes */}
       <Route
@@ -340,6 +351,28 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['admin']}>
             <DashboardLayout>
               <AdminSettings />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Help Routes for all roles */}
+      <Route
+        path="/operator/help"
+        element={
+          <ProtectedRoute allowedRoles={['operator']}>
+            <DashboardLayout>
+              <HelpSupport />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/help"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DashboardLayout>
+              <HelpSupport />
             </DashboardLayout>
           </ProtectedRoute>
         }

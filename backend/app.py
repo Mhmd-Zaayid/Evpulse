@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_pymongo import PyMongo
 from flask_jwt_extended import JWTManager
@@ -19,7 +19,18 @@ def create_app(config_name=None):
     
     # Initialize extensions
     CORS(app, origins=['http://localhost:5173', 'http://localhost:3000'], supports_credentials=True)
-    mongo.init_app(app)
+    
+    # Try to initialize MongoDB
+    try:
+        mongo.init_app(app)
+        # Test the connection
+        with app.app_context():
+            mongo.db.command('ping')
+            print("✅ MongoDB connected successfully!")
+    except Exception as e:
+        print(f"⚠️ MongoDB connection failed: {e}")
+        print("Running in mock mode - database operations will use mock data")
+    
     jwt.init_app(app)
     
     # Register blueprints

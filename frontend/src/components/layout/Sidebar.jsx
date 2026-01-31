@@ -197,12 +197,15 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
         <div className="p-3 border-t border-secondary-100 space-y-2 bg-gradient-to-t from-secondary-50/50 to-white">
           {/* Help Link */}
           {!collapsed && (
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-secondary-600 hover:bg-secondary-100 hover:text-secondary-900 transition-colors group">
+            <NavLink 
+              to={user?.role === 'user' ? '/user/help' : user?.role === 'operator' ? '/operator/help' : '/admin/help'}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-secondary-600 hover:bg-secondary-100 hover:text-secondary-900 transition-colors group"
+            >
               <div className="p-2 rounded-lg bg-secondary-100 text-secondary-500 group-hover:bg-secondary-200 group-hover:text-secondary-700 transition-colors">
                 <HelpCircle className="w-4 h-4" />
               </div>
               <span className="font-medium">Help & Support</span>
-            </button>
+            </NavLink>
           )}
 
           {/* Logout Button */}

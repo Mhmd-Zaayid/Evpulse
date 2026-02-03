@@ -326,6 +326,9 @@ const Transactions = () => {
           pagination={{
             currentPage,
             totalPages: Math.ceil(filteredTransactions.length / itemsPerPage),
+            from: (currentPage - 1) * itemsPerPage + 1,
+            to: Math.min(currentPage * itemsPerPage, filteredTransactions.length),
+            total: filteredTransactions.length,
             onPageChange: setCurrentPage,
           }}
         />

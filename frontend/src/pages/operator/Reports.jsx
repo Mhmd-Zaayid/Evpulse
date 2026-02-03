@@ -93,7 +93,7 @@ const Reports = () => {
     setLoading(true);
     try {
       const response = await operatorAPI.getStats(user.id);
-      setStats(response.data);
+      setStats(response);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     } finally {
@@ -160,13 +160,13 @@ const Reports = () => {
           <Select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            icon={Calendar}
-          >
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="quarter">This Quarter</option>
-            <option value="year">This Year</option>
-          </Select>
+            options={[
+              { value: 'week', label: 'This Week' },
+              { value: 'month', label: 'This Month' },
+              { value: 'quarter', label: 'This Quarter' },
+              { value: 'year', label: 'This Year' },
+            ]}
+          />
           <Button icon={Download} onClick={() => handleExportReport('Full')}>
             Export
           </Button>

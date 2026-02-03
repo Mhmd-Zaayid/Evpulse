@@ -37,7 +37,7 @@ const Settings = () => {
     platformName: 'EvPulse',
     supportEmail: 'support@evpulse.com',
     timezone: 'UTC',
-    currency: 'USD',
+    currency: 'INR',
     language: 'en',
     maintenanceMode: false,
   });

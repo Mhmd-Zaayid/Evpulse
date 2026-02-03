@@ -154,7 +154,7 @@ const Users = () => {
       render: (value, row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
-            {value.split(' ').map(n => n[0]).join('')}
+            {typeof value === 'string' ? value.split(' ').map(n => n[0]).join('') : '?'}
           </div>
           <div>
             <p className="font-medium text-secondary-900">{value}</p>
@@ -355,6 +355,9 @@ const Users = () => {
           pagination={{
             currentPage,
             totalPages: Math.ceil(filteredUsers.length / itemsPerPage),
+            from: (currentPage - 1) * itemsPerPage + 1,
+            to: Math.min(currentPage * itemsPerPage, filteredUsers.length),
+            total: filteredUsers.length,
             onPageChange: setCurrentPage,
           }}
         />

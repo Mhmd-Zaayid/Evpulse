@@ -37,7 +37,7 @@ const Table = ({
                       key={column.key} 
                       className={`px-6 py-4 ${column.cellClassName || ''}`}
                     >
-                      {column.render ? column.render(row) : row[column.key]}
+                      {column.render ? column.render(row[column.key], row) : row[column.key]}
                     </td>
                   ))}
                 </tr>

@@ -380,6 +380,9 @@ const Stations = () => {
           pagination={{
             currentPage,
             totalPages: Math.ceil(filteredStations.length / itemsPerPage),
+            from: (currentPage - 1) * itemsPerPage + 1,
+            to: Math.min(currentPage * itemsPerPage, filteredStations.length),
+            total: filteredStations.length,
             onPageChange: setCurrentPage,
           }}
         />

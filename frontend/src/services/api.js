@@ -254,9 +254,23 @@ export const sessionsAPI = {
 export const bookingsAPI = {
   getByUser: async (userId) => {
     try {
-      return await apiRequest(`/bookings/user/${userId}`);
+      const response = await apiRequest(`/bookings/user/${userId}`);
+      if (response.success && response.data) {
+        return response;
+      }
+      // Fallback to mock data
+      const { bookings } = await import('./mockData');
+      const userBookings = bookings.filter(booking => booking.userId === parseInt(userId));
+      return { success: true, data: userBookings };
     } catch (error) {
-      return { success: false, error: error.message };
+      // Fallback to mock data on error
+      try {
+        const { bookings } = await import('./mockData');
+        const userBookings = bookings.filter(booking => booking.userId === parseInt(userId));
+        return { success: true, data: userBookings };
+      } catch (e) {
+        return { success: false, error: error.message, data: [] };
+      }
     }
   },
 
@@ -468,38 +482,35 @@ export const operatorAPI = {
     try {
       const response = await apiRequest('/operator/stats');
       if (response.success && response.data) {
-        return response;
+        return response.data;
       }
       // Return mock data fallback
       return {
-        success: true,
-        data: {
-          totalStations: 5,
-          activeSessions: 12,
-          todayRevenue: 1245.50,
-          todayEnergy: 856.3,
-          portUtilization: 68,
-          totalPorts: 24,
-          revenueByStation: [
-            { station: 'Downtown Hub', revenue: 450 },
-            { station: 'Mall Parking', revenue: 320 },
-            { station: 'Tech Park', revenue: 280 },
-            { station: 'Highway Rest', revenue: 195.5 },
-          ],
-          sessionsByHour: [
-            { hour: '8AM', sessions: 5 },
-            { hour: '10AM', sessions: 8 },
-            { hour: '12PM', sessions: 12 },
-            { hour: '2PM', sessions: 10 },
-            { hour: '4PM', sessions: 15 },
-            { hour: '6PM', sessions: 18 },
-            { hour: '8PM', sessions: 8 },
-          ],
-          maintenanceAlerts: [
-            { id: 1, stationId: 3, portId: 2, message: 'Port offline - needs inspection', priority: 'high' },
-            { id: 2, stationId: 1, portId: 4, message: 'Scheduled maintenance due', priority: 'medium' },
-          ],
-        },
+        totalStations: 5,
+        activeSessions: 12,
+        todayRevenue: 1245.50,
+        todayEnergy: 856.3,
+        portUtilization: 68,
+        totalPorts: 24,
+        revenueByStation: [
+          { station: 'Downtown Hub', revenue: 450 },
+          { station: 'Mall Parking', revenue: 320 },
+          { station: 'Tech Park', revenue: 280 },
+          { station: 'Highway Rest', revenue: 195.5 },
+        ],
+        sessionsByHour: [
+          { hour: '8AM', sessions: 5 },
+          { hour: '10AM', sessions: 8 },
+          { hour: '12PM', sessions: 12 },
+          { hour: '2PM', sessions: 10 },
+          { hour: '4PM', sessions: 15 },
+          { hour: '6PM', sessions: 18 },
+          { hour: '8PM', sessions: 8 },
+        ],
+        maintenanceAlerts: [
+          { id: 1, stationId: 3, portId: 2, message: 'Port offline - needs inspection', priority: 'high' },
+          { id: 2, stationId: 1, portId: 4, message: 'Scheduled maintenance due', priority: 'medium' },
+        ],
       };
     } catch (error) {
       // Return mock data on error

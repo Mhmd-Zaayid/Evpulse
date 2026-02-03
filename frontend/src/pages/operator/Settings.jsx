@@ -211,24 +211,24 @@ const Settings = () => {
             label="Timezone"
             value={profile.timezone}
             onChange={(e) => setProfile(prev => ({ ...prev, timezone: e.target.value }))}
-            icon={Clock}
-          >
-            <option value="America/New_York">Eastern Time (ET)</option>
-            <option value="America/Chicago">Central Time (CT)</option>
-            <option value="America/Denver">Mountain Time (MT)</option>
-            <option value="America/Los_Angeles">Pacific Time (PT)</option>
-            <option value="UTC">UTC</option>
-          </Select>
+            options={[
+              { value: 'America/New_York', label: 'Eastern Time (ET)' },
+              { value: 'America/Chicago', label: 'Central Time (CT)' },
+              { value: 'America/Denver', label: 'Mountain Time (MT)' },
+              { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+              { value: 'UTC', label: 'UTC' },
+            ]}
+          />
           <Select
             label="Language"
             value="en"
-            icon={Globe}
-          >
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-          </Select>
+            options={[
+              { value: 'en', label: 'English' },
+              { value: 'es', label: 'Spanish' },
+              { value: 'fr', label: 'French' },
+              { value: 'de', label: 'German' },
+            ]}
+          />
         </div>
       </div>
 
@@ -418,12 +418,13 @@ const Settings = () => {
               value={security.sessionTimeout}
               onChange={(e) => setSecurity(prev => ({ ...prev, sessionTimeout: e.target.value }))}
               className="w-32"
-            >
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 hour</option>
-              <option value="120">2 hours</option>
-            </Select>
+              options={[
+                { value: '15', label: '15 minutes' },
+                { value: '30', label: '30 minutes' },
+                { value: '60', label: '1 hour' },
+                { value: '120', label: '2 hours' },
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -495,11 +496,14 @@ const Settings = () => {
               <p className="font-medium text-secondary-900">Payout Schedule</p>
               <p className="text-sm text-secondary-500">Weekly (Every Friday)</p>
             </div>
-            <Select className="w-32">
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Bi-weekly</option>
-              <option value="monthly">Monthly</option>
-            </Select>
+            <Select 
+              className="w-32"
+              options={[
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'biweekly', label: 'Bi-weekly' },
+                { value: 'monthly', label: 'Monthly' },
+              ]}
+            />
           </div>
         </div>
       </div>

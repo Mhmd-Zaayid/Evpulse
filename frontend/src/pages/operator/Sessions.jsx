@@ -24,9 +24,14 @@ const Sessions = () => {
     try {
       // Get stations for this operator
       const stationsRes = await stationsAPI.getByOperator(user.id);
-      setStations(stationsRes.data);
-      
-      // Get all sessions for operator's stations
+      setStations(stationsRes.data || []);
+    } catch (error) {
+      console.error('Failed to fetch stations:', error);
+      setStations([]);
+    }
+    
+    try {
+      // Get all sessions for operator's stations using mock data
       const allSessions = chargingSessions.map(session => ({
         ...session,
         station: chargingStations.find(s => s.id === session.stationId),
@@ -35,6 +40,7 @@ const Sessions = () => {
       setSessions(allSessions);
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -60,7 +66,7 @@ const Sessions = () => {
     {
       key: 'session',
       label: 'Session',
-      render: (row) => (
+      render: (_, row) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
             row.status === 'active' ? 'bg-green-100' : 'bg-secondary-100'
@@ -77,7 +83,7 @@ const Sessions = () => {
     {
       key: 'station',
       label: 'Station',
-      render: (row) => (
+      render: (_, row) => (
         <div>
           <p className="font-medium text-secondary-900">{row.station?.name}</p>
           <p className="text-sm text-secondary-500">Port #{row.portId}</p>
@@ -87,7 +93,7 @@ const Sessions = () => {
     {
       key: 'time',
       label: 'Time',
-      render: (row) => (
+      render: (_, row) => (
         <div>
           <p className="text-secondary-900">{formatDateTime(row.startTime)}</p>
           {row.duration && (
@@ -99,7 +105,7 @@ const Sessions = () => {
     {
       key: 'energy',
       label: 'Energy',
-      render: (row) => (
+      render: (_, row) => (
         <div>
           <p className="font-medium text-secondary-900">{formatEnergy(row.energyDelivered)}</p>
           {row.status === 'active' && row.progress && (
@@ -113,7 +119,7 @@ const Sessions = () => {
     {
       key: 'cost',
       label: 'Cost',
-      render: (row) => (
+      render: (_, row) => (
         <span className="font-semibold text-secondary-900">
           {row.cost ? formatCurrency(row.cost) : '—'}
         </span>
@@ -122,7 +128,7 @@ const Sessions = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (row) => (
+      render: (_, row) => (
         <Badge variant={row.status === 'active' ? 'success' : row.status === 'completed' ? 'info' : 'default'}>
           {getStatusText(row.status)}
         </Badge>

@@ -5,19 +5,26 @@ const Select = ({
   options,
   error,
   className = '',
+  children,
+  icon: Icon,
   ...props
 }) => {
   return (
     <div className={className}>
       {label && <label className="input-label">{label}</label>}
       <div className="relative">
+        {Icon && (
+          <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400 pointer-events-none" />
+        )}
         <select
           className={`input-field appearance-none pr-10 cursor-pointer ${
+            Icon ? 'pl-12' : ''
+          } ${
             error ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
           }`}
           {...props}
         >
-          {options.map((option) => (
+          {children ? children : options?.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

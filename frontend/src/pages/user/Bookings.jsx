@@ -25,14 +25,16 @@ const Bookings = () => {
   const fetchBookings = async () => {
     try {
       const response = await bookingsAPI.getByUser(user.id);
+      const bookingsData = response.data || [];
       // Enrich bookings with station data
-      const enrichedBookings = response.data.map(booking => ({
+      const enrichedBookings = bookingsData.map(booking => ({
         ...booking,
         station: chargingStations.find(s => s.id === booking.stationId),
       }));
       setBookings(enrichedBookings);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ const Bookings = () => {
     {
       key: 'station',
       label: 'Station',
-      render: (row) => (
+      render: (_, row) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
             <Zap className="w-5 h-5 text-primary-600" />
@@ -74,7 +76,7 @@ const Bookings = () => {
     {
       key: 'dateTime',
       label: 'Date & Time',
-      render: (row) => (
+      render: (_, row) => (
         <div>
           <p className="font-medium text-secondary-900">{formatDate(row.date)}</p>
           <p className="text-sm text-secondary-500">{row.timeSlot}</p>
@@ -84,7 +86,7 @@ const Bookings = () => {
     {
       key: 'type',
       label: 'Charging Type',
-      render: (row) => (
+      render: (_, row) => (
         <Badge variant={row.chargingType === 'Fast DC' ? 'primary' : 'default'}>
           {row.chargingType}
         </Badge>
@@ -93,7 +95,7 @@ const Bookings = () => {
     {
       key: 'cost',
       label: 'Est. Cost',
-      render: (row) => (
+      render: (_, row) => (
         <span className="font-medium text-secondary-900">
           {formatCurrency(row.estimatedCost)}
         </span>
@@ -102,7 +104,7 @@ const Bookings = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (row) => (
+      render: (_, row) => (
         <Badge variant={row.status === 'confirmed' ? 'success' : row.status === 'pending' ? 'warning' : 'default'}>
           {getStatusText(row.status)}
         </Badge>
@@ -111,7 +113,7 @@ const Bookings = () => {
     {
       key: 'actions',
       label: '',
-      render: (row) => (
+      render: (_, row) => (
         <div className="flex items-center gap-2">
           {(row.status === 'confirmed' || row.status === 'pending') && (
             <Button

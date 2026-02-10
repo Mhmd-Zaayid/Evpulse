@@ -11,7 +11,8 @@ from bson import ObjectId
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import create_app, mongo
+from app import create_app
+from database import get_db
 from models.user import User
 from models.station import Station
 from models.session import Session
@@ -27,15 +28,20 @@ def seed_database():
     with app.app_context():
         print("🌱 Starting database seeding...")
         
+        db = get_db()
+        if db is None:
+            print("❌ Failed to connect to database. Aborting seed.")
+            return
+        
         # Clear existing data
         print("🗑️  Clearing existing data...")
-        mongo.db.users.delete_many({})
-        mongo.db.stations.delete_many({})
-        mongo.db.sessions.delete_many({})
-        mongo.db.bookings.delete_many({})
-        mongo.db.transactions.delete_many({})
-        mongo.db.reviews.delete_many({})
-        mongo.db.notifications.delete_many({})
+        db.users.delete_many({})
+        db.stations.delete_many({})
+        db.sessions.delete_many({})
+        db.bookings.delete_many({})
+        db.transactions.delete_many({})
+        db.reviews.delete_many({})
+        db.notifications.delete_many({})
         
         # Create users
         print("👤 Creating users...")
@@ -83,7 +89,7 @@ def seed_database():
                 company=user_data.get('company'),
                 department=user_data.get('department')
             )
-            result = mongo.db.users.insert_one(user.to_dict())
+            result = db.users.insert_one(user.to_dict())
             user_ids[user_data['role']] = str(result.inserted_id)
             print(f"   ✓ Created {user_data['role']}: {user_data['email']}")
         
@@ -207,7 +213,7 @@ def seed_database():
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow()
             }
-            result = mongo.db.stations.insert_one(station_doc)
+            result = db.stations.insert_one(station_doc)
             station_ids.append(str(result.inserted_id))
             print(f"   ✓ Created station: {station_data['name']}")
         
@@ -267,7 +273,7 @@ def seed_database():
                 'created_at': session_data['start_time'],
                 'updated_at': datetime.utcnow()
             }
-            mongo.db.sessions.insert_one(session_doc)
+            db.sessions.insert_one(session_doc)
         print(f"   ✓ Created {len(sessions_data)} charging sessions")
         
         # Create sample bookings
@@ -306,7 +312,7 @@ def seed_database():
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow()
             }
-            mongo.db.bookings.insert_one(booking_doc)
+            db.bookings.insert_one(booking_doc)
         print(f"   ✓ Created {len(bookings_data)} bookings")
         
         # Create sample transactions
@@ -330,7 +336,7 @@ def seed_database():
                 'timestamp': datetime.utcnow() - timedelta(days=i),
                 'created_at': datetime.utcnow() - timedelta(days=i)
             }
-            mongo.db.transactions.insert_one(trans_doc)
+            db.transactions.insert_one(trans_doc)
         print(f"   ✓ Created {len(transactions_data)} transactions")
         
         # Create sample reviews
@@ -354,7 +360,7 @@ def seed_database():
                 'timestamp': datetime.utcnow() - timedelta(days=len(reviews_data)),
                 'created_at': datetime.utcnow()
             }
-            mongo.db.reviews.insert_one(review_doc)
+            db.reviews.insert_one(review_doc)
         print(f"   ✓ Created {len(reviews_data)} reviews")
         
         # Create sample notifications
@@ -378,7 +384,7 @@ def seed_database():
                 'timestamp': datetime.utcnow(),
                 'created_at': datetime.utcnow()
             }
-            mongo.db.notifications.insert_one(notif_doc)
+            db.notifications.insert_one(notif_doc)
         print(f"   ✓ Created {len(notifications_data)} notifications")
         
         print("\n✅ Database seeding completed successfully!")

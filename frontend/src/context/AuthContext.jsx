@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('evpulse_user');
+    localStorage.removeItem('evpulse_token');
   };
 
   const updateUser = (updates) => {

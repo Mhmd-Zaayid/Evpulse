@@ -565,6 +565,10 @@ const StationDetail = () => {
                     Port #{selectedPort.id} • {selectedPort.type}
                   </p>
                 </div>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-700 font-medium">Ensure the charging gun is securely connected to the vehicle</p>
+                </div>
                 <Button 
                   fullWidth 
                   icon={Play}

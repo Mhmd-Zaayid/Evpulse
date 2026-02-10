@@ -30,7 +30,21 @@ const OperatorDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       const response = await operatorAPI.getStats(user.id);
-      setStats(response);
+      setStats({
+        totalStations: 0,
+        activeSessions: 0,
+        todayRevenue: 0,
+        todayEnergy: 0,
+        portUtilization: 0,
+        totalPorts: 0,
+        monthlyRevenue: 0,
+        monthlyEnergy: 0,
+        averageSessionDuration: 0,
+        revenueByStation: [],
+        sessionsByHour: [],
+        maintenanceAlerts: [],
+        ...response,
+      });
     } catch (error) {
       console.error('Failed to fetch operator stats:', error);
     } finally {

@@ -1,30 +1,17 @@
 """
 EVPulse Database Package
 ========================
-Advanced MongoDB database connection module with robust error handling,
-connection pooling, health monitoring, and comprehensive diagnostics.
+MongoDB connection module.
 
 Usage:
-    from database import init_db, get_db, get_collection
+    from database import get_db
     
-    # Initialize connection (call once at app startup)
-    init_db()
-    
-    # Get database instance
     db = get_db()
-    
-    # Get a collection
-    users = get_collection('users')
-    
-    # Or use the manager directly
-    from database import get_database_manager
-    manager = get_database_manager()
-    
-    # Health check
-    health = manager.health_check()
-    
-    # Connection stats
-    stats = manager.stats
+    if db is None:
+        # handle no connection
+        pass
+    else:
+        users = db.users.find({})
 """
 
 from .config import (
@@ -45,25 +32,6 @@ from .connection import (
     ConnectionState,
 )
 
-from .exceptions import (
-    DatabaseException,
-    ConnectionError,
-    ConnectionPoolExhaustedError,
-    ConnectionTimeoutError,
-    AuthenticationError,
-    SSLError,
-    ServerSelectionError,
-    OperationError,
-    QueryError,
-    WriteError,
-    TransactionError,
-    ConfigurationError,
-    NetworkError,
-    DatabaseNotInitializedError,
-    RetryExhaustedError,
-    classify_pymongo_error,
-)
-
 from .diagnostics import (
     DatabaseDiagnostics,
     DiagnosticResult,
@@ -77,8 +45,8 @@ __all__ = [
     'get_database_config',
     'set_database_config',
     'Environment',
-    
-    # Connection
+
+    # Connection (primary API)
     'DatabaseConnectionManager',
     'get_database_manager',
     'get_db',
@@ -87,25 +55,7 @@ __all__ = [
     'close_db',
     'with_db_retry',
     'ConnectionState',
-    
-    # Exceptions
-    'DatabaseException',
-    'ConnectionError',
-    'ConnectionPoolExhaustedError',
-    'ConnectionTimeoutError',
-    'AuthenticationError',
-    'SSLError',
-    'ServerSelectionError',
-    'OperationError',
-    'QueryError',
-    'WriteError',
-    'TransactionError',
-    'ConfigurationError',
-    'NetworkError',
-    'DatabaseNotInitializedError',
-    'RetryExhaustedError',
-    'classify_pymongo_error',
-    
+
     # Diagnostics
     'DatabaseDiagnostics',
     'DiagnosticResult',
@@ -113,4 +63,4 @@ __all__ = [
     'quick_test',
 ]
 
-__version__ = '2.0.0'
+__version__ = '3.0.0'

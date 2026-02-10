@@ -1,22 +1,21 @@
 """
 EVPulse Database Connection Manager
 ===================================
-Advanced MongoDB connection manager with:
-- Connection pooling
-- Automatic retry with exponential backoff
-- Health monitoring
-- Graceful reconnection
-- Thread-safe singleton pattern
+Production-grade MongoDB connection with:
+- Lazy connection (connects on first use, not on import)
+- Automatic reconnection (handled by PyMongo driver natively)
+- certifi CA bundle for Atlas TLS (the #1 cause of connection drops)
+- No conflicting URI/option params
+- Thread-safe singleton
+- Clean error messages
 """
 
 import time
-import threading
 import logging
 import atexit
-from datetime import datetime
-from typing import Optional, Dict, Any, Callable, TypeVar, ParamSpec
-from functools import wraps
-from contextlib import contextmanager
+import certifi
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
 
 from pymongo import MongoClient
 from pymongo.database import Database
@@ -24,498 +23,278 @@ from pymongo.collection import Collection
 from pymongo.errors import (
     ServerSelectionTimeoutError,
     ConnectionFailure,
-    AutoReconnect,
-    NetworkTimeout,
     OperationFailure,
 )
 
 from .config import MongoDBConfig, get_database_config
-from .exceptions import (
-    DatabaseException,
-    ConnectionError,
-    ConnectionTimeoutError,
-    AuthenticationError,
-    ServerSelectionError,
-    DatabaseNotInitializedError,
-    RetryExhaustedError,
-    ConfigurationError,
-    classify_pymongo_error,
-)
 
-# Type variables for generic retry decorator
-P = ParamSpec('P')
-T = TypeVar('T')
-
-# Configure logging
 logger = logging.getLogger('evpulse.database')
-
-
-class ConnectionState:
-    """Enum-like class for connection states"""
-    DISCONNECTED = "disconnected"
-    CONNECTING = "connecting"
-    CONNECTED = "connected"
-    RECONNECTING = "reconnecting"
-    ERROR = "error"
 
 
 class DatabaseConnectionManager:
     """
     Singleton MongoDB Connection Manager.
     
-    Provides a robust, thread-safe connection to MongoDB with:
-    - Automatic connection pooling (handled by PyMongo)
-    - Health monitoring
-    - Graceful reconnection
-    - Retry logic with exponential backoff
+    Design principles:
+    - PyMongo already handles connection pooling, retries, and reconnection.
+      We do NOT add custom health-check threads or reconnection loops — that
+      fights the driver and causes race conditions.
+    - Connection is lazy: calling get_db() will connect if needed.
+    - certifi CA bundle is always used for TLS (fixes 90% of Atlas issues).
+    - URI parameters are NOT duplicated in client options.
     """
-    
+
     _instance: Optional['DatabaseConnectionManager'] = None
-    _lock = threading.Lock()
-    
+
     def __new__(cls):
-        """Singleton pattern with thread-safe double-check locking"""
         if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
-        """Initialize the connection manager (only runs once due to singleton)"""
         if self._initialized:
             return
-        
+
         self._client: Optional[MongoClient] = None
         self._db: Optional[Database] = None
         self._config: Optional[MongoDBConfig] = None
-        self._state: str = ConnectionState.DISCONNECTED
-        self._last_error: Optional[Exception] = None
-        self._connection_time: Optional[datetime] = None
-        self._health_check_interval: int = 30  # seconds
-        self._health_check_thread: Optional[threading.Thread] = None
-        self._stop_health_check = threading.Event()
-        self._connection_lock = threading.RLock()
+        self._connected_at: Optional[datetime] = None
         self._stats = {
             'connections_made': 0,
             'connection_failures': 0,
-            'reconnections': 0,
-            'queries_executed': 0,
-            'last_health_check': None,
-            'health_check_failures': 0,
         }
-        
-        # Register cleanup on exit
+
         atexit.register(self._cleanup)
-        
         self._initialized = True
-        logger.info("DatabaseConnectionManager initialized")
-    
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
     @property
     def is_connected(self) -> bool:
-        """Check if currently connected to database"""
-        return self._state == ConnectionState.CONNECTED and self._client is not None
-    
+        """Check if we have an active client. Does NOT ping — that's expensive."""
+        return self._client is not None and self._db is not None
+
     @property
     def state(self) -> str:
-        """Get current connection state"""
-        return self._state
-    
+        return "connected" if self.is_connected else "disconnected"
+
     @property
-    def db(self) -> Database:
+    def db(self) -> Optional[Database]:
         """
-        Get the database instance.
-        Raises DatabaseNotInitializedError if not connected.
+        Get the database. If not connected, attempt to connect automatically.
+        Returns None on failure (so callers can do a simple `if db is None` check).
         """
         if self._db is None:
-            raise DatabaseNotInitializedError(
-                "Database not initialized. Call connect() first."
-            )
+            try:
+                self.connect()
+            except Exception as e:
+                logger.error(f"Auto-connect failed: {e}")
+                return None
         return self._db
-    
+
     @property
-    def client(self) -> MongoClient:
-        """
-        Get the MongoDB client instance.
-        Raises DatabaseNotInitializedError if not connected.
-        """
+    def client(self) -> Optional[MongoClient]:
         if self._client is None:
-            raise DatabaseNotInitializedError(
-                "Database not initialized. Call connect() first."
-            )
+            try:
+                self.connect()
+            except Exception:
+                return None
         return self._client
-    
+
     @property
     def stats(self) -> Dict[str, Any]:
-        """Get connection statistics"""
+        uptime = 0
+        if self._connected_at:
+            uptime = (datetime.now(timezone.utc) - self._connected_at).total_seconds()
         return {
             **self._stats,
-            'state': self._state,
-            'connection_time': self._connection_time.isoformat() if self._connection_time else None,
-            'uptime_seconds': (datetime.utcnow() - self._connection_time).total_seconds() if self._connection_time else 0,
+            'state': self.state,
+            'connection_time': self._connected_at.isoformat() if self._connected_at else None,
+            'uptime_seconds': uptime,
         }
-    
-    def connect(
-        self, 
-        config: Optional[MongoDBConfig] = None,
-        auto_health_check: bool = True
-    ) -> bool:
+
+    # ------------------------------------------------------------------
+    # Core methods
+    # ------------------------------------------------------------------
+
+    def connect(self, config: Optional[MongoDBConfig] = None) -> bool:
         """
-        Establish connection to MongoDB.
+        Connect to MongoDB. Safe to call multiple times — will skip if already connected.
         
-        Args:
-            config: Optional MongoDBConfig. Uses environment config if not provided.
-            auto_health_check: Whether to start automatic health checking.
-        
-        Returns:
-            bool: True if connection successful.
-        
-        Raises:
-            ConfigurationError: If configuration is invalid.
-            ConnectionError: If unable to connect.
+        Returns True on success, raises on failure.
         """
-        with self._connection_lock:
-            # If already connected with same config, return
-            if self.is_connected and config is None:
-                logger.debug("Already connected to database")
-                return True
-            
-            # Get configuration
-            self._config = config or get_database_config()
-            
-            # Validate configuration
-            is_valid, errors = self._config.validate()
-            if not is_valid:
-                raise ConfigurationError(
-                    message="Invalid database configuration",
-                    config_errors=errors
-                )
-            
-            self._state = ConnectionState.CONNECTING
-            logger.info(f"Connecting to MongoDB: {self._config}")
-            
-            try:
-                # Build connection options
-                options = self._config.get_connection_options()
-                
-                # Create MongoDB client
-                self._client = MongoClient(
-                    self._config.uri,
-                    **options
-                )
-                
-                # Test connection with ping
-                self._client.admin.command('ping')
-                
-                # Get database
-                self._db = self._client[self._config.database_name]
-                
-                # Update state
-                self._state = ConnectionState.CONNECTED
-                self._connection_time = datetime.utcnow()
-                self._stats['connections_made'] += 1
-                self._last_error = None
-                
-                logger.info(f"✅ Successfully connected to MongoDB database: {self._config.database_name}")
-                
-                # Start health check if enabled
-                if auto_health_check:
-                    self._start_health_check()
-                
-                return True
-                
-            except Exception as e:
-                self._state = ConnectionState.ERROR
-                self._last_error = e
-                self._stats['connection_failures'] += 1
-                
-                # Convert to our exception type
-                db_error = classify_pymongo_error(e)
-                logger.error(f"❌ Failed to connect to MongoDB: {db_error}")
-                raise db_error
-    
-    def disconnect(self) -> None:
-        """Gracefully disconnect from MongoDB"""
-        with self._connection_lock:
-            logger.info("Disconnecting from MongoDB...")
-            
-            # Stop health check
-            self._stop_health_check.set()
-            if self._health_check_thread and self._health_check_thread.is_alive():
-                self._health_check_thread.join(timeout=5)
-            
-            # Close client
+        if self.is_connected and config is None:
+            return True
+
+        self._config = config or get_database_config()
+
+        is_valid, errors = self._config.validate()
+        if not is_valid:
+            msg = f"Invalid database configuration: {'; '.join(errors)}"
+            logger.error(msg)
+            raise ValueError(msg)
+
+        logger.info(f"Connecting to MongoDB ({self._config})")
+
+        try:
+            # Close any stale client first
             if self._client:
                 try:
                     self._client.close()
-                except Exception as e:
-                    logger.warning(f"Error closing MongoDB client: {e}")
-            
-            self._client = None
-            self._db = None
-            self._state = ConnectionState.DISCONNECTED
-            self._connection_time = None
-            
-            logger.info("✅ Disconnected from MongoDB")
-    
-    def reconnect(self) -> bool:
-        """
-        Attempt to reconnect to MongoDB.
-        Uses exponential backoff for retry attempts.
-        """
-        with self._connection_lock:
-            self._state = ConnectionState.RECONNECTING
-            self._stats['reconnections'] += 1
-            
-            logger.info("Attempting to reconnect to MongoDB...")
-            
-            # Close existing connection if any
-            if self._client:
-                try:
-                    self._client.close()
-                except:
+                except Exception:
                     pass
                 self._client = None
                 self._db = None
-            
-            # Retry connection
-            max_attempts = self._config.max_retry_attempts if self._config else 3
-            delay = self._config.retry_delay_seconds if self._config else 1.0
-            backoff = self._config.retry_backoff_multiplier if self._config else 2.0
-            
-            last_error = None
-            for attempt in range(max_attempts):
-                try:
-                    self._state = ConnectionState.CONNECTING
-                    return self.connect(self._config, auto_health_check=True)
-                except Exception as e:
-                    last_error = e
-                    logger.warning(f"Reconnection attempt {attempt + 1}/{max_attempts} failed: {e}")
-                    
-                    if attempt < max_attempts - 1:
-                        time.sleep(delay)
-                        delay *= backoff
-            
-            self._state = ConnectionState.ERROR
-            raise RetryExhaustedError(
-                message="Failed to reconnect after multiple attempts",
-                attempts=max_attempts,
-                last_error=last_error
+
+            # Build client options — ONLY options that are NOT in the URI
+            options = self._config.get_connection_options()
+
+            self._client = MongoClient(self._config.uri, **options)
+
+            # Verify connectivity with a ping
+            self._client.admin.command('ping')
+
+            self._db = self._client[self._config.database_name]
+            self._connected_at = datetime.now(timezone.utc)
+            self._stats['connections_made'] += 1
+
+            logger.info(f"Connected to MongoDB database: {self._config.database_name}")
+            return True
+
+        except ServerSelectionTimeoutError as e:
+            self._stats['connection_failures'] += 1
+            self._client = None
+            self._db = None
+            msg = (
+                "Could not reach MongoDB server. Check:\n"
+                "  1. Your MONGODB_URI in .env is correct\n"
+                "  2. Your IP is whitelisted in Atlas (Network Access -> Add Current IP)\n"
+                "  3. The cluster is not paused (Atlas free-tier pauses after 60 days)\n"
+                f"  Original error: {e}"
             )
-    
+            logger.error(msg)
+            raise ConnectionError(msg) from e
+
+        except OperationFailure as e:
+            self._stats['connection_failures'] += 1
+            self._client = None
+            self._db = None
+            error_str = str(e).lower()
+            if 'auth' in error_str:
+                msg = (
+                    "MongoDB authentication failed. Check:\n"
+                    "  1. Username and password in MONGODB_URI\n"
+                    "  2. The user has readWrite access to the database\n"
+                    f"  Original error: {e}"
+                )
+            else:
+                msg = f"MongoDB operation failed: {e}"
+            logger.error(msg)
+            raise ConnectionError(msg) from e
+
+        except Exception as e:
+            self._stats['connection_failures'] += 1
+            self._client = None
+            self._db = None
+            logger.error(f"MongoDB connection failed: {e}")
+            raise ConnectionError(f"MongoDB connection failed: {e}") from e
+
+    def disconnect(self) -> None:
+        """Gracefully close the connection."""
+        if self._client:
+            try:
+                self._client.close()
+            except Exception as e:
+                logger.warning(f"Error closing MongoDB client: {e}")
+        self._client = None
+        self._db = None
+        self._connected_at = None
+        logger.info("Disconnected from MongoDB")
+
     def health_check(self) -> Dict[str, Any]:
-        """
-        Perform health check on the database connection.
-        
-        Returns:
-            Dict with health check results.
-        """
-        result = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'state': self._state,
+        """Ping the server and return health info."""
+        result: Dict[str, Any] = {
             'healthy': False,
             'latency_ms': None,
             'error': None,
         }
-        
+
         if not self._client:
-            result['error'] = "No client connection"
+            result['error'] = "No active connection"
             return result
-        
+
         try:
             start = time.time()
             self._client.admin.command('ping')
             latency = (time.time() - start) * 1000
-            
             result['healthy'] = True
             result['latency_ms'] = round(latency, 2)
-            self._stats['last_health_check'] = datetime.utcnow()
-            
         except Exception as e:
-            result['healthy'] = False
             result['error'] = str(e)
-            self._stats['health_check_failures'] += 1
             logger.warning(f"Health check failed: {e}")
-        
+
         return result
-    
-    def _start_health_check(self) -> None:
-        """Start background health check thread"""
-        self._stop_health_check.clear()
-        
-        def health_check_loop():
-            while not self._stop_health_check.is_set():
-                try:
-                    check = self.health_check()
-                    if not check['healthy'] and self._state == ConnectionState.CONNECTED:
-                        logger.warning("Health check failed, attempting reconnection...")
-                        try:
-                            self.reconnect()
-                        except Exception as e:
-                            logger.error(f"Reconnection failed: {e}")
-                except Exception as e:
-                    logger.error(f"Error in health check loop: {e}")
-                
-                self._stop_health_check.wait(self._health_check_interval)
-        
-        self._health_check_thread = threading.Thread(
-            target=health_check_loop,
-            daemon=True,
-            name="mongodb-health-check"
-        )
-        self._health_check_thread.start()
-        logger.debug("Started health check background thread")
-    
+
+    def get_collection(self, name: str) -> Optional[Collection]:
+        """Get a collection. Returns None if DB is not available."""
+        db = self.db
+        if db is None:
+            return None
+        return db[name]
+
     def _cleanup(self) -> None:
-        """Cleanup resources on exit"""
         try:
             self.disconnect()
-        except:
+        except Exception:
             pass
-    
-    def get_collection(self, name: str) -> Collection:
+
+    @classmethod
+    def reset(cls) -> None:
         """
-        Get a collection from the database.
-        
-        Args:
-            name: Collection name.
-        
-        Returns:
-            PyMongo Collection object.
+        Reset the singleton. Used for testing or when you need to
+        force a fresh connection (e.g., after changing .env).
         """
-        return self.db[name]
-    
-    def execute_with_retry(
-        self,
-        operation: Callable[[], T],
-        max_retries: Optional[int] = None,
-        retry_on: tuple = (AutoReconnect, NetworkTimeout, ConnectionFailure),
-    ) -> T:
-        """
-        Execute a database operation with automatic retry.
-        
-        Args:
-            operation: Callable that performs the database operation.
-            max_retries: Maximum retry attempts (uses config default if None).
-            retry_on: Tuple of exception types to retry on.
-        
-        Returns:
-            Result of the operation.
-        """
-        max_attempts = max_retries or (self._config.max_retry_attempts if self._config else 3)
-        delay = self._config.retry_delay_seconds if self._config else 1.0
-        backoff = self._config.retry_backoff_multiplier if self._config else 2.0
-        
-        last_error = None
-        for attempt in range(max_attempts):
+        if cls._instance and cls._instance._client:
             try:
-                result = operation()
-                self._stats['queries_executed'] += 1
-                return result
-            except retry_on as e:
-                last_error = e
-                logger.warning(f"Operation failed (attempt {attempt + 1}/{max_attempts}): {e}")
-                
-                if attempt < max_attempts - 1:
-                    time.sleep(delay)
-                    delay *= backoff
-                    
-                    # Check connection and reconnect if needed
-                    if not self.is_connected:
-                        try:
-                            self.reconnect()
-                        except:
-                            pass
-        
-        raise RetryExhaustedError(
-            message="Database operation failed after retries",
-            attempts=max_attempts,
-            last_error=last_error
-        )
-    
-    @contextmanager
-    def transaction(self):
-        """
-        Context manager for MongoDB transactions.
-        Note: Requires MongoDB replica set.
-        
-        Usage:
-            with db_manager.transaction() as session:
-                collection.insert_one({...}, session=session)
-                collection.update_one({...}, {...}, session=session)
-        """
-        if not self._client:
-            raise DatabaseNotInitializedError()
-        
-        with self._client.start_session() as session:
-            with session.start_transaction():
-                yield session
+                cls._instance._client.close()
+            except Exception:
+                pass
+        cls._instance = None
 
 
-# Retry decorator for database operations
-def with_db_retry(
-    max_retries: int = 3,
-    retry_on: tuple = (AutoReconnect, NetworkTimeout, ConnectionFailure),
-):
-    """
-    Decorator to add retry logic to database operations.
-    
-    Usage:
-        @with_db_retry(max_retries=3)
-        def my_db_operation():
-            return db.collection.find_one({})
-    """
-    def decorator(func: Callable[P, T]) -> Callable[P, T]:
-        @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            manager = get_database_manager()
-            return manager.execute_with_retry(
-                lambda: func(*args, **kwargs),
-                max_retries=max_retries,
-                retry_on=retry_on
-            )
-        return wrapper
-    return decorator
-
-
-# Global manager instance
-_manager: Optional[DatabaseConnectionManager] = None
-
+# ======================================================================
+# Module-level convenience functions — these are the PUBLIC API
+# ======================================================================
 
 def get_database_manager() -> DatabaseConnectionManager:
-    """Get the global database connection manager instance"""
-    global _manager
-    if _manager is None:
-        _manager = DatabaseConnectionManager()
-    return _manager
+    """Get the singleton connection manager."""
+    return DatabaseConnectionManager()
 
 
-def get_db() -> Database:
+def get_db() -> Optional[Database]:
     """
-    Convenience function to get the database instance.
-    Equivalent to get_database_manager().db
+    Get the MongoDB database instance.
+    Returns None if connection is unavailable (caller should check).
+    Auto-connects on first call.
     """
     return get_database_manager().db
 
 
-def get_collection(name: str) -> Collection:
+def get_collection(name: str) -> Optional[Collection]:
     """
-    Convenience function to get a collection.
-    Equivalent to get_database_manager().get_collection(name)
+    Get a MongoDB collection by name.
+    Returns None if connection is unavailable.
     """
     return get_database_manager().get_collection(name)
 
 
 def init_db(config: Optional[MongoDBConfig] = None) -> DatabaseConnectionManager:
     """
-    Initialize database connection.
-    
-    Args:
-        config: Optional MongoDBConfig. Uses environment config if not provided.
-    
-    Returns:
-        DatabaseConnectionManager instance.
+    Initialize database connection explicitly.
+    Called during app startup, but get_db() also auto-connects.
     """
     manager = get_database_manager()
     manager.connect(config)
@@ -523,6 +302,22 @@ def init_db(config: Optional[MongoDBConfig] = None) -> DatabaseConnectionManager
 
 
 def close_db() -> None:
-    """Close database connection"""
-    manager = get_database_manager()
-    manager.disconnect()
+    """Close the database connection."""
+    get_database_manager().disconnect()
+
+
+# Keep backward-compatible name
+ConnectionState = type('ConnectionState', (), {
+    'CONNECTED': 'connected',
+    'DISCONNECTED': 'disconnected',
+})
+
+
+def with_db_retry(*args, **kwargs):
+    """No-op decorator kept for backward compatibility.
+    PyMongo 4.x handles retries natively via retryWrites/retryReads."""
+    def decorator(func):
+        return func
+    if args and callable(args[0]):
+        return args[0]
+    return decorator

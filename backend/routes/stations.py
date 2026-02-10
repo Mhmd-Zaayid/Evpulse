@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import mongo
+from database import get_db
 from models.station import Station
 from bson import ObjectId
 from datetime import datetime
@@ -26,8 +26,8 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def get_all_stations():
     """Get all stations with optional filters"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         # Get query parameters
@@ -47,7 +47,7 @@ def get_all_stations():
             query['city'] = city
         
         # Fetch from MongoDB database
-        stations_data = list(mongo.db.stations.find(query))
+        stations_data = list(db.stations.find(query))
         stations = []
         
         for data in stations_data:
@@ -89,11 +89,11 @@ def get_all_stations():
 def get_station_by_id(station_id):
     """Get a specific station by ID"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
-        station_data = mongo.db.stations.find_one({'_id': ObjectId(station_id)})
+        station_data = db.stations.find_one({'_id': ObjectId(station_id)})
         
         if not station_data:
             return jsonify({'success': False, 'error': 'Station not found'}), 404
@@ -107,11 +107,11 @@ def get_station_by_id(station_id):
 def get_stations_by_operator(operator_id):
     """Get all stations for a specific operator"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
-        stations_data = list(mongo.db.stations.find({'operator_id': operator_id}))
+        stations_data = list(db.stations.find({'operator_id': operator_id}))
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
         
         return jsonify({'success': True, 'data': stations})
@@ -123,12 +123,12 @@ def get_stations_by_operator(operator_id):
 def create_station():
     """Create a new station (operator/admin only)"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         user_id = get_jwt_identity()
-        user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        user_data = db.users.find_one({'_id': ObjectId(user_id)})
         
         if not user_data or user_data.get('role') not in ['operator', 'admin']:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -149,7 +149,7 @@ def create_station():
             image=data.get('image')
         )
         
-        result = mongo.db.stations.insert_one(station.to_dict())
+        result = db.stations.insert_one(station.to_dict())
         station.id = str(result.inserted_id)
         
         return jsonify({'success': True, 'data': station.to_response_dict()}), 201
@@ -161,19 +161,19 @@ def create_station():
 def update_station(station_id):
     """Update a station"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         user_id = get_jwt_identity()
         data = request.get_json()
         
         # Verify ownership or admin
-        station_data = mongo.db.stations.find_one({'_id': ObjectId(station_id)})
+        station_data = db.stations.find_one({'_id': ObjectId(station_id)})
         if not station_data:
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         
-        user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        user_data = db.users.find_one({'_id': ObjectId(user_id)})
         if station_data.get('operator_id') != user_id and user_data.get('role') != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
@@ -183,12 +183,12 @@ def update_station(station_id):
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         update_data['updated_at'] = datetime.utcnow()
         
-        mongo.db.stations.update_one(
+        db.stations.update_one(
             {'_id': ObjectId(station_id)},
             {'$set': update_data}
         )
         
-        updated_station = mongo.db.stations.find_one({'_id': ObjectId(station_id)})
+        updated_station = db.stations.find_one({'_id': ObjectId(station_id)})
         station = Station.from_dict(updated_station)
         
         return jsonify({'success': True, 'data': station.to_response_dict()})
@@ -200,8 +200,8 @@ def update_station(station_id):
 def update_station_status(station_id):
     """Update station status"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         user_id = get_jwt_identity()
@@ -211,7 +211,7 @@ def update_station_status(station_id):
         if new_status not in ['available', 'busy', 'offline']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
         
-        result = mongo.db.stations.update_one(
+        result = db.stations.update_one(
             {'_id': ObjectId(station_id)},
             {'$set': {'status': new_status, 'updated_at': datetime.utcnow()}}
         )
@@ -228,8 +228,8 @@ def update_station_status(station_id):
 def update_port_status(station_id, port_id):
     """Update a specific port status"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         data = request.get_json()
@@ -238,7 +238,7 @@ def update_port_status(station_id, port_id):
         if new_status not in ['available', 'busy', 'offline']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
         
-        result = mongo.db.stations.update_one(
+        result = db.stations.update_one(
             {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
             {'$set': {'ports.$.status': new_status, 'updated_at': datetime.utcnow()}}
         )

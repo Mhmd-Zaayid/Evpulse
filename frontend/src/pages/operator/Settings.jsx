@@ -84,9 +84,7 @@ const Settings = () => {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'business', label: 'Business', icon: Building2 },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'security', label: 'Security', icon: Shield },
     { id: 'billing', label: 'Billing', icon: CreditCard },
-    { id: 'help', label: 'Help', icon: HelpCircle },
   ];
 
   const handleSaveProfile = async () => {

@@ -1,7 +1,7 @@
 """
 EVPulse Flask Application
 =========================
-Main Flask application with advanced MongoDB database integration.
+Main Flask application with MongoDB database integration.
 """
 
 import os
@@ -25,23 +25,15 @@ jwt = JWTManager()
 def create_app(config_name: str = None) -> Flask:
     """
     Application factory for creating Flask app.
-    
-    Args:
-        config_name: Configuration name ('development', 'production', 'testing')
-    
-    Returns:
-        Configured Flask application
     """
-    # Load environment variables
     from dotenv import load_dotenv
     load_dotenv()
-    
+
     if config_name is None:
         config_name = os.getenv('FLASK_ENV', 'development')
-    
-    # Create Flask app
+
     app = Flask(__name__)
-    
+
     # Load configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
@@ -49,117 +41,65 @@ def create_app(config_name: str = None) -> Flask:
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
-    
+
     # Initialize CORS
     CORS(app, origins=['http://localhost:5173', 'http://localhost:3000'], supports_credentials=True)
-    
+
     # Initialize JWT
     jwt.init_app(app)
-    
+
     # Initialize database connection
     db_initialized = _initialize_database(app)
-    
-    # Store database status in app config
     app.config['DATABASE_INITIALIZED'] = db_initialized
-    
+
     # Register blueprints
     _register_blueprints(app)
-    
+
     # Register routes
     _register_routes(app)
-    
+
     return app
 
 
 def _initialize_database(app: Flask) -> bool:
     """
-    Initialize database connection with the new advanced database module.
-    
-    Args:
-        app: Flask application instance
-    
-    Returns:
-        bool: True if database initialized successfully
+    Initialize database connection.
+    Non-fatal: the app starts even if DB is down (get_db() will retry later).
     """
-    logger.info("=" * 60)
-    logger.info("🔗 Initializing EVPulse Database Connection")
-    logger.info("=" * 60)
-    
+    logger.info("=" * 50)
+    logger.info("Initializing EVPulse Database Connection")
+    logger.info("=" * 50)
+
     try:
-        # Import the new database module
-        from database import (
-            init_db, 
-            get_database_manager, 
-            quick_test,
-            run_diagnostics,
-            MongoDBConfig,
-            get_database_config
-        )
-        
-        # Get configuration
+        from database import init_db, get_database_config
+
         config = get_database_config()
-        
-        # Validate configuration
         is_valid, errors = config.validate()
         if not is_valid:
-            logger.error("❌ Database configuration errors:")
             for error in errors:
-                logger.error(f"   - {error}")
+                logger.error(f"  Config error: {error}")
             return False
-        
-        logger.info(f"📋 Configuration: {config}")
-        
-        # Quick connection test first
-        logger.info("🧪 Running quick connection test...")
-        if quick_test():
-            logger.info("✅ Quick test passed!")
-        else:
-            logger.warning("⚠️ Quick test failed, running full diagnostics...")
-            diagnostics = run_diagnostics()
-            if not diagnostics.get('all_passed', False):
-                logger.error("❌ Diagnostics failed. Check suggestions above.")
-                return False
-        
-        # Initialize the database connection
-        logger.info("🚀 Establishing database connection...")
+
+        logger.info(f"Config: {config}")
+
         manager = init_db(config)
-        
+
         if manager.is_connected:
-            logger.info("✅ Database connection established successfully!")
-            
-            # Get database stats
             db = manager.db
             collections = db.list_collection_names()
-            logger.info(f"📂 Database: {config.database_name}")
-            logger.info(f"📁 Collections: {collections}")
-            
-            # Initialize sample data if needed
+            logger.info(f"Database: {config.database_name}")
+            logger.info(f"Collections: {collections}")
             _initialize_sample_data(manager)
-            
-            # Store manager reference
             app.config['DB_MANAGER'] = manager
-            
+            logger.info("Database connection established successfully")
             return True
         else:
-            logger.error("❌ Failed to establish database connection")
+            logger.warning("Database not connected — will retry on first request")
             return False
-            
-    except ImportError as e:
-        logger.error(f"❌ Database module import error: {e}")
-        logger.error("Make sure the 'database' package is in the backend directory")
-        return False
-        
+
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
-        
-        # Run diagnostics to help troubleshoot
-        try:
-            from database import run_diagnostics
-            logger.info("🔍 Running diagnostics to identify the issue...")
-            run_diagnostics()
-        except:
-            pass
-        
+        logger.error(f"Database initialization failed: {e}")
+        logger.warning("App will start without DB — get_db() will auto-retry on requests")
         return False
 
 
@@ -184,8 +124,8 @@ def _initialize_sample_data(manager) -> None:
                 import sys
                 import os
                 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
-                from seed_db import seed_database_data
-                seed_database_data()
+                from seed_db import seed_database
+                seed_database()
                 logger.info("✅ Sample data seeded successfully!")
             except ImportError:
                 logger.warning("⚠️ Seeder script not found, creating basic users...")
@@ -403,48 +343,19 @@ def _register_routes(app: Flask) -> None:
             }), 500
 
 
-# Global reference to the database for backward compatibility with routes
-# This allows routes that use `from app import mongo` to continue working
-class MongoProxy:
-    """
-    Proxy class for backward compatibility with flask-pymongo style access.
-    Routes can use `mongo.db` as before.
-    """
-    
-    @property
-    def db(self):
-        try:
-            from database import get_db
-            return get_db()
-        except:
-            return None
-    
-    @property
-    def cx(self):
-        try:
-            from database import get_database_manager
-            return get_database_manager().client
-        except:
-            return None
-
-
-# Create mongo proxy for backward compatibility
-mongo = MongoProxy()
-
 # Mock data flag (set to False to use real database)
 USE_MOCK_DATA = False
 
 
 if __name__ == '__main__':
     app = create_app()
-    
-    print("\n" + "=" * 60)
-    print("🚀 Starting EVPulse API Server")
-    print("=" * 60)
-    print("📍 Server: http://localhost:5000")
-    print("📚 Health Check: http://localhost:5000/api/health")
-    print("🔧 DB Status: http://localhost:5000/api/db/status")
-    print("🔍 DB Diagnostics: http://localhost:5000/api/db/diagnostics")
-    print("=" * 60 + "\n")
-    
+
+    print("\n" + "=" * 50)
+    print("Starting EVPulse API Server")
+    print("=" * 50)
+    print("Server: http://localhost:5000")
+    print("Health: http://localhost:5000/api/health")
+    print("DB Status: http://localhost:5000/api/db/status")
+    print("=" * 50 + "\n")
+
     app.run(debug=True, port=5000, host='0.0.0.0', use_reloader=False)

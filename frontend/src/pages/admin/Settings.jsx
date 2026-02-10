@@ -79,8 +79,6 @@ const Settings = () => {
     { id: 'general', label: 'General', icon: Globe },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
-    { id: 'integrations', label: 'Integrations', icon: Server },
-    { id: 'database', label: 'Database', icon: Database },
   ];
 
   const handleSave = async (section) => {

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import mongo
+from database import get_db
 from models.user import User
 from bson import ObjectId
 from datetime import datetime
@@ -12,11 +12,11 @@ users_bp = Blueprint('users', __name__)
 def get_user(user_id):
     """Get user by ID"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
-        user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        user_data = db.users.find_one({'_id': ObjectId(user_id)})
         
         if not user_data:
             return jsonify({'success': False, 'error': 'User not found'}), 404
@@ -31,15 +31,15 @@ def get_user(user_id):
 def update_user(user_id):
     """Update user profile"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         current_user_id = get_jwt_identity()
         
         # Check authorization
         if current_user_id != user_id:
-            current_user = mongo.db.users.find_one({'_id': ObjectId(current_user_id)})
+            current_user = db.users.find_one({'_id': ObjectId(current_user_id)})
             if current_user.get('role') != 'admin':
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
@@ -50,7 +50,7 @@ def update_user(user_id):
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         update_data['updated_at'] = datetime.utcnow()
         
-        result = mongo.db.users.update_one(
+        result = db.users.update_one(
             {'_id': ObjectId(user_id)},
             {'$set': update_data}
         )
@@ -59,7 +59,7 @@ def update_user(user_id):
             return jsonify({'success': False, 'error': 'User not found or no changes made'}), 404
         
         # Get updated user
-        user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        user_data = db.users.find_one({'_id': ObjectId(user_id)})
         user = User.from_dict(user_data)
         
         return jsonify({'success': True, 'data': user.to_safe_dict()})
@@ -71,12 +71,12 @@ def update_user(user_id):
 def update_user_status(user_id):
     """Update user status (admin only)"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         current_user_id = get_jwt_identity()
-        current_user = mongo.db.users.find_one({'_id': ObjectId(current_user_id)})
+        current_user = db.users.find_one({'_id': ObjectId(current_user_id)})
         
         if current_user.get('role') != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -87,7 +87,7 @@ def update_user_status(user_id):
         if is_active is None:
             return jsonify({'success': False, 'error': 'isActive field is required'}), 400
         
-        result = mongo.db.users.update_one(
+        result = db.users.update_one(
             {'_id': ObjectId(user_id)},
             {'$set': {'is_active': is_active, 'updated_at': datetime.utcnow()}}
         )
@@ -104,12 +104,12 @@ def update_user_status(user_id):
 def search_users():
     """Search users (admin only)"""
     try:
-        # Check if database is available
-        if mongo.db is None:
+        db = get_db()
+        if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
         current_user_id = get_jwt_identity()
-        current_user = mongo.db.users.find_one({'_id': ObjectId(current_user_id)})
+        current_user = db.users.find_one({'_id': ObjectId(current_user_id)})
         
         if current_user.get('role') != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -126,7 +126,7 @@ def search_users():
         if role:
             search_query['role'] = role
         
-        users_data = list(mongo.db.users.find(search_query).limit(50))
+        users_data = list(db.users.find(search_query).limit(50))
         users = [User.from_dict(data).to_safe_dict() for data in users_data]
         
         return jsonify({'success': True, 'data': users})

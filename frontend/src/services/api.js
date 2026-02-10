@@ -70,7 +70,7 @@ export const authAPI = {
 
   getCurrentUser: async () => {
     try {
-      return await apiRequest('/auth/me');
+      return await apiRequest('/auth/profile');
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -78,7 +78,7 @@ export const authAPI = {
 
   updateProfile: async (data) => {
     try {
-      return await apiRequest('/auth/update-profile', {
+      return await apiRequest('/auth/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       });
@@ -90,7 +90,7 @@ export const authAPI = {
   changePassword: async (currentPassword, newPassword) => {
     try {
       return await apiRequest('/auth/change-password', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
     } catch (error) {
@@ -513,33 +513,33 @@ export const operatorAPI = {
         ],
       };
     } catch (error) {
-      // Return mock data on error
+      // Return mock data on error (flat format matching success path)
       return {
-        success: true,
-        data: {
-          totalStations: 5,
-          activeSessions: 12,
-          todayRevenue: 1245.50,
-          todayEnergy: 856.3,
-          portUtilization: 68,
-          totalPorts: 24,
-          revenueByStation: [
-            { station: 'Downtown Hub', revenue: 450 },
-            { station: 'Mall Parking', revenue: 320 },
-            { station: 'Tech Park', revenue: 280 },
-            { station: 'Highway Rest', revenue: 195.5 },
-          ],
-          sessionsByHour: [
-            { hour: '8AM', sessions: 5 },
-            { hour: '10AM', sessions: 8 },
-            { hour: '12PM', sessions: 12 },
-            { hour: '2PM', sessions: 10 },
-            { hour: '4PM', sessions: 15 },
-            { hour: '6PM', sessions: 18 },
-            { hour: '8PM', sessions: 8 },
-          ],
-          maintenanceAlerts: [],
-        },
+        totalStations: 5,
+        activeSessions: 12,
+        todayRevenue: 1245.50,
+        todayEnergy: 856.3,
+        portUtilization: 68,
+        totalPorts: 24,
+        monthlyRevenue: 8450.00,
+        monthlyEnergy: 5680.5,
+        averageSessionDuration: 42,
+        revenueByStation: [
+          { station: 'Downtown Hub', revenue: 450 },
+          { station: 'Mall Parking', revenue: 320 },
+          { station: 'Tech Park', revenue: 280 },
+          { station: 'Highway Rest', revenue: 195.5 },
+        ],
+        sessionsByHour: [
+          { hour: '8AM', sessions: 5 },
+          { hour: '10AM', sessions: 8 },
+          { hour: '12PM', sessions: 12 },
+          { hour: '2PM', sessions: 10 },
+          { hour: '4PM', sessions: 15 },
+          { hour: '6PM', sessions: 18 },
+          { hour: '8PM', sessions: 8 },
+        ],
+        maintenanceAlerts: [],
       };
     }
   },

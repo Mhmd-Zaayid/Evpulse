@@ -14,17 +14,23 @@ export const formatNumber = (number) => {
 
 // Format date
 export const formatDate = (date, options = {}) => {
+  if (!date) return 'N/A';
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) return 'N/A';
   const defaultOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   };
-  return new Date(date).toLocaleDateString('en-US', { ...defaultOptions, ...options });
+  return parsed.toLocaleDateString('en-US', { ...defaultOptions, ...options });
 };
 
 // Format time
 export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString('en-US', {
+  if (!date) return 'N/A';
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) return 'N/A';
+  return parsed.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -32,6 +38,9 @@ export const formatTime = (date) => {
 
 // Format datetime
 export const formatDateTime = (date) => {
+  if (!date) return 'N/A';
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) return 'N/A';
   return `${formatDate(date)} ${formatTime(date)}`;
 };
 
@@ -50,14 +59,16 @@ export const formatRelativeTime = (date) => {
 
 // Format energy (kWh)
 export const formatEnergy = (kwh) => {
+  if (kwh === undefined || kwh === null || isNaN(kwh)) return '0.0 kWh';
   if (kwh >= 1000) {
     return `${(kwh / 1000).toFixed(2)} MWh`;
   }
-  return `${kwh.toFixed(1)} kWh`;
+  return `${Number(kwh).toFixed(1)} kWh`;
 };
 
 // Format duration
 export const formatDuration = (minutes) => {
+  if (minutes === undefined || minutes === null || isNaN(minutes)) return '0 min';
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import mongo
+from database import get_db
 from models.session import Session
 from models.notification import Notification
 from bson import ObjectId
@@ -8,12 +8,18 @@ from datetime import datetime, timedelta
 
 sessions_bp = Blueprint('sessions', __name__)
 
+DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
+
 @sessions_bp.route('/user/<user_id>', methods=['GET'])
 @jwt_required()
 def get_user_sessions(user_id):
     """Get all sessions for a user"""
     try:
-        sessions_data = list(mongo.db.sessions.find({'user_id': user_id}).sort('start_time', -1))
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        sessions_data = list(db.sessions.find({'user_id': user_id}).sort('start_time', -1))
         sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
         
         return jsonify({'success': True, 'data': sessions})
@@ -25,7 +31,11 @@ def get_user_sessions(user_id):
 def get_active_session(user_id):
     """Get active session for a user"""
     try:
-        session_data = mongo.db.sessions.find_one({
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        session_data = db.sessions.find_one({
             'user_id': user_id,
             'status': 'active'
         })
@@ -43,11 +53,15 @@ def get_active_session(user_id):
 def start_session():
     """Start a new charging session"""
     try:
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
         user_id = get_jwt_identity()
         data = request.get_json()
         
         # Check if user already has an active session
-        existing = mongo.db.sessions.find_one({
+        existing = db.sessions.find_one({
             'user_id': user_id,
             'status': 'active'
         })
@@ -59,7 +73,7 @@ def start_session():
             }), 400
         
         # Update port status to busy
-        mongo.db.stations.update_one(
+        db.stations.update_one(
             {'_id': ObjectId(data['stationId']), 'ports.id': data['portId']},
             {'$set': {'ports.$.status': 'busy'}}
         )
@@ -75,7 +89,7 @@ def start_session():
         session.battery_start = data.get('batteryStart', 20)
         session.estimated_completion = datetime.utcnow() + timedelta(minutes=45)
         
-        result = mongo.db.sessions.insert_one(session.to_dict())
+        result = db.sessions.insert_one(session.to_dict())
         session.id = str(result.inserted_id)
         
         return jsonify({'success': True, 'data': session.to_response_dict()}), 201
@@ -87,7 +101,11 @@ def start_session():
 def stop_session(session_id):
     """Stop a charging session"""
     try:
-        session_data = mongo.db.sessions.find_one({'_id': ObjectId(session_id)})
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        session_data = db.sessions.find_one({'_id': ObjectId(session_id)})
         
         if not session_data:
             return jsonify({'success': False, 'error': 'Session not found'}), 404
@@ -99,7 +117,7 @@ def stop_session(session_id):
         duration_minutes = int(duration_seconds / 60)
         
         # Get station for pricing
-        station = mongo.db.stations.find_one({'_id': ObjectId(session_data['station_id'])})
+        station = db.stations.find_one({'_id': ObjectId(session_data['station_id'])})
         
         # Calculate cost (simplified pricing)
         energy_rate = 0.35 if 'fast' in session_data.get('charging_type', '').lower() else 0.25
@@ -107,7 +125,7 @@ def stop_session(session_id):
         cost = round(energy_delivered * energy_rate, 2)
         
         # Update session
-        mongo.db.sessions.update_one(
+        db.sessions.update_one(
             {'_id': ObjectId(session_id)},
             {'$set': {
                 'status': 'completed',
@@ -121,7 +139,7 @@ def stop_session(session_id):
         )
         
         # Update port status back to available
-        mongo.db.stations.update_one(
+        db.stations.update_one(
             {'_id': ObjectId(session_data['station_id']), 'ports.id': session_data['port_id']},
             {'$set': {'ports.$.status': 'available'}}
         )
@@ -136,7 +154,7 @@ def stop_session(session_id):
             description=f"Charging session at station",
             session_id=session_id
         )
-        mongo.db.transactions.insert_one(transaction.to_dict())
+        db.transactions.insert_one(transaction.to_dict())
         
         # Create notification
         notification = Notification(
@@ -146,10 +164,10 @@ def stop_session(session_id):
             message=f'Your vehicle has finished charging. Total: ${cost}',
             action_url='/user/history'
         )
-        mongo.db.notifications.insert_one(notification.to_dict())
+        db.notifications.insert_one(notification.to_dict())
         
         # Get updated session
-        updated_session = mongo.db.sessions.find_one({'_id': ObjectId(session_id)})
+        updated_session = db.sessions.find_one({'_id': ObjectId(session_id)})
         session = Session.from_dict(updated_session)
         
         return jsonify({'success': True, 'data': session.to_response_dict()})
@@ -161,7 +179,11 @@ def stop_session(session_id):
 def get_station_sessions(station_id):
     """Get all sessions for a station"""
     try:
-        sessions_data = list(mongo.db.sessions.find({'station_id': station_id}).sort('start_time', -1))
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        sessions_data = list(db.sessions.find({'station_id': station_id}).sort('start_time', -1))
         sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
         
         return jsonify({'success': True, 'data': sessions})
@@ -173,7 +195,11 @@ def get_station_sessions(station_id):
 def get_charging_history(user_id):
     """Get charging history for a user"""
     try:
-        sessions_data = list(mongo.db.sessions.find({
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        sessions_data = list(db.sessions.find({
             'user_id': user_id,
             'status': 'completed'
         }).sort('start_time', -1))
@@ -181,7 +207,7 @@ def get_charging_history(user_id):
         history = []
         for data in sessions_data:
             session = Session.from_dict(data)
-            station = mongo.db.stations.find_one({'_id': ObjectId(session.station_id)})
+            station = db.stations.find_one({'_id': ObjectId(session.station_id)})
             
             history_item = session.to_response_dict()
             history_item['stationName'] = station['name'] if station else 'Unknown Station'
@@ -196,7 +222,11 @@ def get_charging_history(user_id):
 def get_user_stats(user_id):
     """Get charging statistics for a user"""
     try:
-        sessions = list(mongo.db.sessions.find({
+        db = get_db()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        
+        sessions = list(db.sessions.find({
             'user_id': user_id,
             'status': 'completed'
         }))

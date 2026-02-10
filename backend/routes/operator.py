@@ -1,45 +1,53 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import mongo
+from database import get_db
 from models.station import Station
 from bson import ObjectId
 from datetime import datetime, timedelta
 
 operator_bp = Blueprint('operator', __name__)
 
+DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
+
 def require_operator():
-    """Helper to check operator role"""
+    """Check operator role. Returns (is_operator, db) tuple."""
+    db = get_db()
+    if db is None:
+        return False, None
     user_id = get_jwt_identity()
-    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
-    return user and user.get('role') in ['operator', 'admin']
+    user = db.users.find_one({'_id': ObjectId(user_id)})
+    is_op = user and user.get('role') in ['operator', 'admin']
+    return is_op, db
 
 @operator_bp.route('/stats', methods=['GET'])
 @jwt_required()
 def get_operator_stats():
     """Get operator dashboard statistics"""
     try:
-        user_id = get_jwt_identity()
-        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
-        
-        if not user or user.get('role') not in ['operator', 'admin']:
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
+
+        user_id = get_jwt_identity()
+
         # Get operator's stations
-        stations = list(mongo.db.stations.find({'operator_id': user_id}))
+        stations = list(db.stations.find({'operator_id': user_id}))
         station_ids = [str(s['_id']) for s in stations]
         
         total_stations = len(stations)
         total_ports = sum(len(s.get('ports', [])) for s in stations)
         
         # Get active sessions
-        active_sessions = mongo.db.sessions.count_documents({
+        active_sessions = db.sessions.count_documents({
             'station_id': {'$in': station_ids},
             'status': 'active'
         })
         
         # Today's stats
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_sessions = list(mongo.db.sessions.find({
+        today_sessions = list(db.sessions.find({
             'station_id': {'$in': station_ids},
             'start_time': {'$gte': today}
         }))
@@ -49,7 +57,7 @@ def get_operator_stats():
         
         # Monthly stats
         month_ago = datetime.utcnow() - timedelta(days=30)
-        month_sessions = list(mongo.db.sessions.find({
+        month_sessions = list(db.sessions.find({
             'station_id': {'$in': station_ids},
             'start_time': {'$gte': month_ago}
         }))
@@ -71,7 +79,7 @@ def get_operator_stats():
         port_utilization = (busy_ports / max(total_active_ports, 1)) * 100
         
         # Average session duration
-        completed_sessions = list(mongo.db.sessions.find({
+        completed_sessions = list(db.sessions.find({
             'station_id': {'$in': station_ids},
             'status': 'completed'
         }))
@@ -136,12 +144,14 @@ def get_operator_stats():
 def get_operator_stations():
     """Get operator's stations"""
     try:
-        user_id = get_jwt_identity()
-        
-        if not require_operator():
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-        stations_data = list(mongo.db.stations.find({'operator_id': user_id}))
+
+        user_id = get_jwt_identity()
+        stations_data = list(db.stations.find({'operator_id': user_id}))
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
         
         return jsonify({'success': True, 'data': stations})
@@ -153,13 +163,16 @@ def get_operator_stations():
 def update_pricing(station_id):
     """Update station pricing"""
     try:
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
         user_id = get_jwt_identity()
         
-        if not require_operator():
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
         # Verify ownership
-        station = mongo.db.stations.find_one({'_id': ObjectId(station_id)})
+        station = db.stations.find_one({'_id': ObjectId(station_id)})
         if not station:
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         
@@ -168,7 +181,7 @@ def update_pricing(station_id):
         
         data = request.get_json()
         
-        mongo.db.stations.update_one(
+        db.stations.update_one(
             {'_id': ObjectId(station_id)},
             {'$set': {
                 'pricing': data.get('pricing', {}),
@@ -186,9 +199,10 @@ def update_pricing(station_id):
 def update_port_status(station_id, port_id):
     """Update port status"""
     try:
-        user_id = get_jwt_identity()
-        
-        if not require_operator():
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         data = request.get_json()
@@ -197,7 +211,7 @@ def update_port_status(station_id, port_id):
         if new_status not in ['available', 'busy', 'offline']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
         
-        result = mongo.db.stations.update_one(
+        result = db.stations.update_one(
             {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
             {'$set': {'ports.$.status': new_status, 'updated_at': datetime.utcnow()}}
         )
@@ -214,12 +228,14 @@ def update_port_status(station_id, port_id):
 def get_maintenance_alerts():
     """Get maintenance alerts for operator's stations"""
     try:
-        user_id = get_jwt_identity()
-        
-        if not require_operator():
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-        stations = list(mongo.db.stations.find({'operator_id': user_id}))
+
+        user_id = get_jwt_identity()
+        stations = list(db.stations.find({'operator_id': user_id}))
         
         alerts = []
         for station in stations:
@@ -245,19 +261,21 @@ def get_maintenance_alerts():
 def get_operator_feedback():
     """Get feedback for operator's stations"""
     try:
-        user_id = get_jwt_identity()
-        
-        if not require_operator():
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-        stations = list(mongo.db.stations.find({'operator_id': user_id}))
+
+        user_id = get_jwt_identity()
+        stations = list(db.stations.find({'operator_id': user_id}))
         
         feedback = []
         for station in stations:
-            reviews = list(mongo.db.reviews.find({'station_id': str(station['_id'])}).sort('timestamp', -1).limit(5))
+            reviews = list(db.reviews.find({'station_id': str(station['_id'])}).sort('timestamp', -1).limit(5))
             
             # Rating breakdown
-            all_reviews = list(mongo.db.reviews.find({'station_id': str(station['_id'])}))
+            all_reviews = list(db.reviews.find({'station_id': str(station['_id'])}))
             rating_breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
             for r in all_reviews:
                 rating = r.get('rating', 0)
@@ -288,7 +306,10 @@ def get_operator_feedback():
 def resolve_alert(alert_id):
     """Resolve a maintenance alert"""
     try:
-        if not require_operator():
+        is_op, db = require_operator()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         # Parse alert_id (format: station_id-port_id)
@@ -299,7 +320,7 @@ def resolve_alert(alert_id):
         station_id, port_id = parts
         
         # Update port status to available
-        result = mongo.db.stations.update_one(
+        result = db.stations.update_one(
             {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
             {'$set': {'ports.$.status': 'available', 'updated_at': datetime.utcnow()}}
         )

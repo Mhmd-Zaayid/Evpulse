@@ -408,28 +408,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Eco Impact */}
-          <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-6 text-white">
-            <div className="flex items-center gap-3 mb-4">
-              <Leaf className="w-8 h-8" />
-              <h2 className="text-lg font-semibold">Your Eco Impact</h2>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-white/80 text-sm">CO₂ Emissions Saved</p>
-                <p className="text-2xl font-bold">{stats?.co2Saved || 0} kg</p>
-              </div>
-              <div>
-                <p className="text-white/80 text-sm">Equivalent to</p>
-                <p className="text-lg font-semibold">
-                  🌳 {Math.round((stats?.co2Saved || 0) / 21)} trees planted
-                </p>
-              </div>
-              <p className="text-white/70 text-xs">
-                Thank you for choosing electric! Every charge helps the planet.
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

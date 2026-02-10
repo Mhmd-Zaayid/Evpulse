@@ -13,7 +13,7 @@ const Landing = () => {
               <Battery className="w-8 h-8" style={{ color: '#c8ff00' }} />
               <span className="text-2xl font-bold text-white">EvPulse</span>
             </div>
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden md:flex items-center gap-8 px-8 py-3 rounded-full bg-white/5 backdrop-blur-md border border-white/10 shadow-lg">
               <a href="#home" className="text-white/80 hover:text-white transition-colors text-sm font-medium">Home</a>
               <a href="#features" className="text-white/80 hover:text-white transition-colors text-sm font-medium">Features</a>
               <a href="#dashboard" className="text-white/80 hover:text-white transition-colors text-sm font-medium">Dashboard</a>
@@ -63,7 +63,7 @@ const Landing = () => {
 
             {/* Right Side - Charging Station */}
             <div className="lg:col-span-6 flex justify-center lg:justify-end">
-              <div className="relative flex items-center justify-center w-full h-full">
+              <div className="relative flex items-center justify-center w-full h-full mt-20">
                 <img 
                   src="https://ekoenergetyka.com/wp-content/uploads/2024/11/c46ebcb54e12c38e69ecab6aa5eb0986335215209f546097ffd7c25681aa9338.png"
                   alt="EV Charging Station"

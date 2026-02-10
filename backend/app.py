@@ -43,7 +43,7 @@ def create_app(config_name: str = None) -> Flask:
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
 
     # Initialize CORS
-    CORS(app, origins=['http://localhost:5173', 'http://localhost:3000'], supports_credentials=True)
+    CORS(app, origins=['http://localhost:5173', 'http://localhost:5175', 'http://localhost:3000'], supports_credentials=True)
 
     # Initialize JWT
     jwt.init_app(app)

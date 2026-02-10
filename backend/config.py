@@ -24,7 +24,7 @@ class Config:
     JWT_HEADER_TYPE = 'Bearer'
     
     # CORS Configuration
-    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000']
+    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:5175', 'http://localhost:3000']
 
 
 class DevelopmentConfig(Config):

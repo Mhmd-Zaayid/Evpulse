@@ -157,7 +157,7 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Admin Dashboard</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Admin Dashboard</h1>
           <p className="text-secondary-500 mt-1">System overview and analytics</p>
         </div>
         <div className="flex items-center gap-2 bg-secondary-100 rounded-xl p-1">
@@ -417,40 +417,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* System Health */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-secondary-900">System Health</h3>
-            <p className="text-sm text-secondary-500">Current platform status</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { name: 'API Services', status: 'operational', uptime: '99.99%' },
-            { name: 'Payment Gateway', status: 'operational', uptime: '99.95%' },
-            { name: 'Database', status: 'operational', uptime: '99.98%' },
-            { name: 'Notification Service', status: 'degraded', uptime: '98.50%' },
-          ].map((service) => (
-            <div key={service.name} className="p-4 bg-secondary-50 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-secondary-900">{service.name}</span>
-                <div className={`w-3 h-3 rounded-full ${
-                  service.status === 'operational' ? 'bg-green-500' : 'bg-amber-500'
-                }`} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className={`text-sm capitalize ${
-                  service.status === 'operational' ? 'text-green-600' : 'text-amber-600'
-                }`}>
-                  {service.status}
-                </span>
-                <span className="text-sm text-secondary-500">{service.uptime} uptime</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

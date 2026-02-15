@@ -26,7 +26,6 @@ import {
   Stations as OperatorStations,
   Sessions as OperatorSessions,
   Feedback as OperatorFeedback,
-  Maintenance,
   Reports as OperatorReports,
   Settings as OperatorSettings,
 } from './pages/operator';
@@ -249,16 +248,6 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['operator']}>
             <DashboardLayout>
               <OperatorFeedback />
-            </DashboardLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/operator/maintenance"
-        element={
-          <ProtectedRoute allowedRoles={['operator']}>
-            <DashboardLayout>
-              <Maintenance />
             </DashboardLayout>
           </ProtectedRoute>
         }

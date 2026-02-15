@@ -53,7 +53,7 @@ const StatCard = ({
   }
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6 border border-secondary-100 ${className}`}>
+    <div className={`rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6 border border-secondary-100 ${className}`} style={{ backgroundColor: '#abf7b1' }}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-secondary-500">{title}</p>

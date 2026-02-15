@@ -44,7 +44,6 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
     { to: '/operator/stations', icon: Building2, label: 'My Stations' },
     { to: '/operator/sessions', icon: Zap, label: 'Sessions' },
     { to: '/operator/feedback', icon: BarChart3, label: 'Feedback' },
-    { to: '/operator/maintenance', icon: Wrench, label: 'Maintenance' },
     { to: '/operator/reports', icon: FileText, label: 'Reports' },
     { to: '/operator/settings', icon: Settings, label: 'Settings' },
   ];
@@ -95,12 +94,13 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-white border-r border-secondary-100 transition-all duration-300 ease-in-out z-50 flex flex-col shadow-xl lg:shadow-none ${
+        className={`fixed left-0 top-0 h-screen border-r border-secondary-100 transition-all duration-300 ease-in-out z-50 flex flex-col shadow-xl lg:shadow-none ${
           collapsed ? 'lg:w-20' : 'lg:w-72'
         } ${mobileOpen ? 'w-72 translate-x-0' : 'w-72 -translate-x-full lg:translate-x-0'}`}
+        style={{ backgroundColor: '#abf7b1' }}
       >
         {/* Logo Header */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-secondary-100 bg-gradient-to-r from-white to-secondary-50/50">
+        <div className="h-16 flex items-center justify-between px-6 border-b border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-green-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/25 ring-2 ring-primary-500/20">
               <Zap className="w-5 h-5 text-white" />
@@ -193,7 +193,7 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
         </nav>
 
         {/* Bottom Section */}
-        <div className="p-3 border-t border-secondary-100 space-y-2 bg-gradient-to-t from-secondary-50/50 to-white">
+        <div className="p-3 border-t border-secondary-100 space-y-2" style={{ backgroundColor: '#abf7b1' }}>
           {/* Help Link */}
           {!collapsed && (
             <NavLink 
@@ -224,7 +224,8 @@ const Sidebar = ({ mobileOpen, onMobileClose }) => {
         {/* Collapse Toggle - Desktop Only */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-white border border-secondary-200 rounded-full items-center justify-center shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200"
+          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 border border-secondary-200 rounded-full items-center justify-center shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200"
+          style={{ backgroundColor: '#abf7b1' }}
         >
           {collapsed ? (
             <ChevronRight className="w-3.5 h-3.5 text-secondary-600" />

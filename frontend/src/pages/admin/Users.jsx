@@ -249,7 +249,7 @@ const Users = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">User Management</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">User Management</h1>
           <p className="text-secondary-500 mt-1">Manage users, operators, and admins</p>
         </div>
         <div className="flex items-center gap-3">
@@ -264,7 +264,7 @@ const Users = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
               <UsersIcon className="w-6 h-6 text-primary-600" />
@@ -275,7 +275,7 @@ const Users = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
               <CheckCircle className="w-6 h-6 text-green-600" />
@@ -286,7 +286,7 @@ const Users = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
               <Shield className="w-6 h-6 text-blue-600" />
@@ -297,7 +297,7 @@ const Users = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
               <Calendar className="w-6 h-6 text-amber-600" />

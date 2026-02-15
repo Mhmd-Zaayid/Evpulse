@@ -120,7 +120,7 @@ const Feedback = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Feedback Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900 ml-4">Feedback Management</h1>
           <p className="text-gray-600 mt-1">Review and moderate customer feedback across all stations</p>
         </div>
         <Button variant="outline" className="flex items-center gap-2">
@@ -131,7 +131,7 @@ const Feedback = () => {
 
       {/* Platform Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Platform Rating</p>
@@ -149,7 +149,7 @@ const Feedback = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Reviews</p>
@@ -167,7 +167,7 @@ const Feedback = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Pending Review</p>
@@ -182,7 +182,7 @@ const Feedback = () => {
           <p className="text-sm text-yellow-600 mt-2">Requires moderation</p>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Flagged Reviews</p>
@@ -197,7 +197,7 @@ const Feedback = () => {
           <p className="text-sm text-red-600 mt-2">Needs attention</p>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Satisfaction Rate</p>

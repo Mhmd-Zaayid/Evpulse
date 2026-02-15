@@ -8,9 +8,6 @@ import {
   Bar,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -39,13 +36,6 @@ const Reports = () => {
   const [reportType, setReportType] = useState('overview');
 
   // Mock data
-  const revenueData = [
-    { date: 'Week 1', revenue: 45600, target: 42000 },
-    { date: 'Week 2', revenue: 52300, target: 48000 },
-    { date: 'Week 3', revenue: 48900, target: 50000 },
-    { date: 'Week 4', revenue: 61200, target: 55000 },
-  ];
-
   const userGrowthData = [
     { month: 'Aug', newUsers: 320, activeUsers: 2100 },
     { month: 'Sep', newUsers: 410, activeUsers: 2380 },
@@ -68,14 +58,6 @@ const Reports = () => {
     { name: 'Airport Terminal', utilization: 89, revenue: 28900, sessions: 412 },
     { name: 'Tech Park', utilization: 68, revenue: 9870, sessions: 156 },
     { name: 'University', utilization: 71, revenue: 7650, sessions: 128 },
-  ];
-
-  const revenueByRegion = [
-    { name: 'California', value: 45600, color: '#22c55e' },
-    { name: 'Texas', value: 32400, color: '#0ea5e9' },
-    { name: 'New York', value: 29800, color: '#8b5cf6' },
-    { name: 'Florida', value: 24500, color: '#f59e0b' },
-    { name: 'Other', value: 35700, color: '#64748b' },
   ];
 
   const sessionsByHour = [
@@ -111,7 +93,7 @@ const Reports = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Reports & Analytics</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Reports & Analytics</h1>
           <p className="text-secondary-500 mt-1">Comprehensive system insights and metrics</p>
         </div>
         <div className="flex items-center gap-3">
@@ -157,7 +139,7 @@ const Reports = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((kpi) => (
-          <div key={kpi.label} className="card">
+          <div key={kpi.label} className="card" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-start justify-between">
               <div className={`p-3 rounded-xl ${kpi.color}`}>
                 <kpi.icon className="w-6 h-6" />
@@ -179,32 +161,6 @@ const Reports = () => {
 
       {/* Main Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue vs Target */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-secondary-900">Revenue vs Target</h3>
-              <p className="text-sm text-secondary-500">Weekly performance comparison</p>
-            </div>
-          </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' }}
-                  formatter={(value) => formatCurrency(value)}
-                />
-                <Legend />
-                <Bar dataKey="revenue" name="Revenue" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="target" name="Target" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
         {/* User Growth */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -262,49 +218,6 @@ const Reports = () => {
                 <Bar dataKey="level2" name="Level 2" stackId="a" fill="#0ea5e9" />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Revenue by Region */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-secondary-900">Revenue by Region</h3>
-              <p className="text-sm text-secondary-500">Geographic distribution</p>
-            </div>
-          </div>
-          <div className="flex items-center">
-            <div className="w-1/2 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={revenueByRegion}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {revenueByRegion.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="w-1/2 space-y-3">
-              {revenueByRegion.map((region) => (
-                <div key={region.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: region.color }} />
-                    <span className="text-sm text-secondary-700">{region.name}</span>
-                  </div>
-                  <span className="text-sm font-medium text-secondary-900">{formatCurrency(region.value)}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

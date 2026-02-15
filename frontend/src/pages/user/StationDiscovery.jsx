@@ -78,7 +78,7 @@ const StationDiscovery = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Find Charging Stations</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Find Charging Stations</h1>
           <p className="text-secondary-500 mt-1">Discover nearby EV charging stations</p>
         </div>
         

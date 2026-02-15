@@ -173,14 +173,14 @@ const HelpSupport = () => {
         <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-500/25">
           <HelpCircle className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-2xl font-bold text-secondary-900">Help & Support</h1>
+        <h1 className="text-2xl font-bold text-secondary-900 ml-4">Help & Support</h1>
         <p className="text-secondary-500 mt-2">Find answers to common questions or get in touch with our team</p>
       </div>
 
       {/* Quick Contact Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {contactOptions.map((option, index) => (
-          <div key={index} className="card hover:shadow-xl transition-all duration-300 group">
+          <div key={index} className="card hover:shadow-xl transition-all duration-300 group" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex flex-col items-center text-center">
               <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-500 transition-colors">
                 <option.icon className="w-6 h-6 text-primary-600 group-hover:text-white transition-colors" />

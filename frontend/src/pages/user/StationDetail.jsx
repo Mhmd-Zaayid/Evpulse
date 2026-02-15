@@ -266,7 +266,7 @@ const StationDetail = () => {
           <div className="absolute bottom-4 left-6 right-6">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-white">{station.name}</h1>
+                <h1 className="text-2xl font-bold text-white ml-4">{station.name}</h1>
                 <div className="flex items-center gap-2 mt-1 text-white/80">
                   <MapPin className="w-4 h-4" />
                   <span className="text-sm">{station.address}</span>
@@ -281,22 +281,22 @@ const StationDetail = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-secondary-50 rounded-xl">
+          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
             <Star className="w-6 h-6 text-amber-400 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{station.rating}</p>
             <p className="text-sm text-secondary-500">{station.totalReviews} reviews</p>
           </div>
-          <div className="text-center p-4 bg-secondary-50 rounded-xl">
+          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
             <MapPin className="w-6 h-6 text-primary-500 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{formatDistance(station.distance)}</p>
             <p className="text-sm text-secondary-500">Distance</p>
           </div>
-          <div className="text-center p-4 bg-secondary-50 rounded-xl">
+          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
             <Zap className="w-6 h-6 text-green-500 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{availablePorts.length}/{station.ports.length}</p>
             <p className="text-sm text-secondary-500">Available Ports</p>
           </div>
-          <div className="text-center p-4 bg-secondary-50 rounded-xl">
+          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
             <Clock className="w-6 h-6 text-blue-500 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{station.operatingHours}</p>
             <p className="text-sm text-secondary-500">Hours</p>

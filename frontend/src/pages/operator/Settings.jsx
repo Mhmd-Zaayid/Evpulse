@@ -600,7 +600,7 @@ const Settings = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-secondary-900">Settings</h1>
+        <h1 className="text-2xl font-bold text-secondary-900 ml-4">Settings</h1>
         <p className="text-secondary-500 mt-1">Manage your account and preferences</p>
       </div>
 

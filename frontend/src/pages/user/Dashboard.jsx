@@ -87,7 +87,7 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">
             Welcome back, {user?.name?.split(' ')[0]}! 👋
           </h1>
           <p className="text-secondary-500 mt-1">
@@ -139,7 +139,7 @@ const Dashboard = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+        <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
               <Zap className="w-6 h-6 text-primary-600" />
@@ -157,7 +157,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+        <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
               <CreditCard className="w-6 h-6 text-green-600" />
@@ -174,7 +174,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+        <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
               <Leaf className="w-6 h-6 text-emerald-600" />
@@ -191,7 +191,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+        <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
               <Clock className="w-6 h-6 text-purple-600" />

@@ -118,14 +118,14 @@ const Feedback = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Station Feedback</h1>
+          <h1 className="text-2xl font-bold text-gray-900 ml-4">Station Feedback</h1>
           <p className="text-gray-600 mt-1">Monitor and manage customer reviews</p>
         </div>
       </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Average Rating</p>
@@ -142,7 +142,7 @@ const Feedback = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Reviews</p>
@@ -159,7 +159,7 @@ const Feedback = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Positive Reviews</p>
@@ -176,7 +176,7 @@ const Feedback = () => {
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Issues Resolved</p>

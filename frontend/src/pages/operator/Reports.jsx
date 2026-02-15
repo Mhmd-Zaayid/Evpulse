@@ -8,9 +8,6 @@ import {
   Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,7 +16,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import {
-  Download,
   Calendar,
   TrendingUp,
   TrendingDown,
@@ -49,28 +45,12 @@ const Reports = () => {
     { date: 'Sun', revenue: 289, sessions: 14 },
   ];
 
-  const energyData = [
-    { date: 'Mon', energy: 156, peak: 42, offPeak: 114 },
-    { date: 'Tue', energy: 198, peak: 58, offPeak: 140 },
-    { date: 'Wed', energy: 175, peak: 48, offPeak: 127 },
-    { date: 'Thu', energy: 245, peak: 72, offPeak: 173 },
-    { date: 'Fri', energy: 267, peak: 85, offPeak: 182 },
-    { date: 'Sat', energy: 221, peak: 65, offPeak: 156 },
-    { date: 'Sun', energy: 189, peak: 52, offPeak: 137 },
-  ];
-
   const utilizationData = [
     { name: 'Downtown Hub', utilization: 78 },
     { name: 'Mall Parking', utilization: 65 },
     { name: 'Highway Rest', utilization: 82 },
     { name: 'Tech Park', utilization: 71 },
     { name: 'Airport', utilization: 89 },
-  ];
-
-  const portTypeData = [
-    { name: 'DC Fast (150kW)', value: 45, color: '#22c55e' },
-    { name: 'DC Fast (50kW)', value: 30, color: '#0ea5e9' },
-    { name: 'Level 2 (22kW)', value: 25, color: '#8b5cf6' },
   ];
 
   const peakHoursData = [
@@ -153,7 +133,7 @@ const Reports = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Reports & Analytics</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Reports & Analytics</h1>
           <p className="text-secondary-500 mt-1">Comprehensive performance insights</p>
         </div>
         <div className="flex items-center gap-3">
@@ -167,16 +147,13 @@ const Reports = () => {
               { value: 'year', label: 'This Year' },
             ]}
           />
-          <Button icon={Download} onClick={() => handleExportReport('Full')}>
-            Export
-          </Button>
         </div>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryStats.map((stat) => (
-          <div key={stat.label} className="card">
+          <div key={stat.label} className="card" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-start justify-between">
               <div className={`p-3 rounded-xl ${stat.color}`}>
                 <stat.icon className="w-6 h-6" />
@@ -238,45 +215,8 @@ const Reports = () => {
         </div>
       </div>
 
-      {/* Energy and Peak Hours */}
+      {/* Peak Hours and Station Utilization */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Energy Consumption */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-secondary-900">Energy Consumption</h3>
-              <p className="text-sm text-secondary-500">Peak vs Off-Peak usage</p>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              icon={FileText}
-              onClick={() => handleExportReport('Energy')}
-            >
-              Export
-            </Button>
-          </div>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={energyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="peak" name="Peak (kWh)" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="offPeak" name="Off-Peak (kWh)" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
         {/* Peak Hours */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -310,10 +250,7 @@ const Reports = () => {
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {/* Utilization and Port Types */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Station Utilization */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -342,75 +279,6 @@ const Reports = () => {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Port Type Distribution */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-secondary-900">Usage by Port Type</h3>
-              <p className="text-sm text-secondary-500">Session distribution</p>
-            </div>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={portTypeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {portTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-            {portTypeData.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-sm text-secondary-600">{item.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Export Options */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Export Reports</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { name: 'Revenue Report', desc: 'Financial summary' },
-            { name: 'Energy Report', desc: 'Consumption data' },
-            { name: 'Session Report', desc: 'Usage statistics' },
-            { name: 'Maintenance Log', desc: 'Service history' },
-          ].map((report) => (
-            <button
-              key={report.name}
-              onClick={() => handleExportReport(report.name)}
-              className="p-4 border-2 border-secondary-200 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <FileText className="w-5 h-5 text-primary-500" />
-                <span className="font-medium text-secondary-900">{report.name}</span>
-              </div>
-              <p className="text-sm text-secondary-500">{report.desc}</p>
-            </button>
-          ))}
         </div>
       </div>
     </div>

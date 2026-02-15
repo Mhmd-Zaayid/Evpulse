@@ -214,7 +214,7 @@ const Transactions = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Transactions</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Transactions</h1>
           <p className="text-secondary-500 mt-1">Monitor all financial transactions</p>
         </div>
         <Button icon={Download} onClick={handleExport}>
@@ -224,7 +224,7 @@ const Transactions = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-green-600" />
@@ -235,7 +235,7 @@ const Transactions = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-blue-600" />
@@ -246,7 +246,7 @@ const Transactions = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
               <RefreshCw className="w-6 h-6 text-amber-600" />
@@ -257,7 +257,7 @@ const Transactions = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
               <Receipt className="w-6 h-6 text-purple-600" />

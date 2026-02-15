@@ -5,7 +5,6 @@ import {
   Settings as SettingsIcon,
   Globe,
   Bell,
-  Shield,
   Database,
   Mail,
   Server,
@@ -54,15 +53,7 @@ const Settings = () => {
     maintenanceAlerts: true,
   });
 
-  // Security settings
-  const [security, setSecurity] = useState({
-    twoFactorRequired: false,
-    sessionTimeout: '60',
-    passwordMinLength: '8',
-    passwordExpiry: '90',
-    maxLoginAttempts: '5',
-    ipWhitelist: '',
-  });
+
 
   // Integration settings
   const [integrations, setIntegrations] = useState({
@@ -78,7 +69,6 @@ const Settings = () => {
   const tabs = [
     { id: 'general', label: 'General', icon: Globe },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'security', label: 'Security', icon: Shield },
   ];
 
   const handleSave = async (section) => {
@@ -258,101 +248,6 @@ const Settings = () => {
 
       <div className="flex justify-end">
         <Button icon={Save} onClick={() => handleSave('Notification')} loading={loading}>
-          Save Changes
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderSecuritySettings = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Authentication</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
-            <div>
-              <p className="font-medium text-secondary-900">Require Two-Factor Authentication</p>
-              <p className="text-sm text-secondary-500">Force all admins to use 2FA</p>
-            </div>
-            <button
-              onClick={() => setSecurity(prev => ({ ...prev, twoFactorRequired: !prev.twoFactorRequired }))}
-              className={`w-12 h-6 rounded-full transition-colors ${
-                security.twoFactorRequired ? 'bg-primary-500' : 'bg-secondary-300'
-              }`}
-            >
-              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                security.twoFactorRequired ? 'translate-x-6' : 'translate-x-0.5'
-              }`} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Session Settings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Session Timeout (minutes)"
-            value={security.sessionTimeout}
-            onChange={(e) => setSecurity(prev => ({ ...prev, sessionTimeout: e.target.value }))}
-          >
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">1 hour</option>
-            <option value="120">2 hours</option>
-            <option value="480">8 hours</option>
-          </Select>
-          <Select
-            label="Max Login Attempts"
-            value={security.maxLoginAttempts}
-            onChange={(e) => setSecurity(prev => ({ ...prev, maxLoginAttempts: e.target.value }))}
-          >
-            <option value="3">3 attempts</option>
-            <option value="5">5 attempts</option>
-            <option value="10">10 attempts</option>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Password Policy</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Minimum Password Length"
-            value={security.passwordMinLength}
-            onChange={(e) => setSecurity(prev => ({ ...prev, passwordMinLength: e.target.value }))}
-          >
-            <option value="8">8 characters</option>
-            <option value="10">10 characters</option>
-            <option value="12">12 characters</option>
-            <option value="16">16 characters</option>
-          </Select>
-          <Select
-            label="Password Expiry (days)"
-            value={security.passwordExpiry}
-            onChange={(e) => setSecurity(prev => ({ ...prev, passwordExpiry: e.target.value }))}
-          >
-            <option value="30">30 days</option>
-            <option value="60">60 days</option>
-            <option value="90">90 days</option>
-            <option value="never">Never</option>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">IP Whitelist</h3>
-        <Input
-          label="Allowed IP Addresses"
-          value={security.ipWhitelist}
-          onChange={(e) => setSecurity(prev => ({ ...prev, ipWhitelist: e.target.value }))}
-          placeholder="Enter IP addresses separated by commas"
-          helperText="Leave empty to allow all IPs"
-        />
-      </div>
-
-      <div className="flex justify-end">
-        <Button icon={Save} onClick={() => handleSave('Security')} loading={loading}>
           Save Changes
         </Button>
       </div>
@@ -574,8 +469,6 @@ const Settings = () => {
         return renderGeneralSettings();
       case 'notifications':
         return renderNotificationSettings();
-      case 'security':
-        return renderSecuritySettings();
       case 'integrations':
         return renderIntegrationSettings();
       case 'database':
@@ -589,7 +482,7 @@ const Settings = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-secondary-900">System Settings</h1>
+        <h1 className="text-2xl font-bold text-secondary-900 ml-4">System Settings</h1>
         <p className="text-secondary-500 mt-1">Configure platform settings and preferences</p>
       </div>
 

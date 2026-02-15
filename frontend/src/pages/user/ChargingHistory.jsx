@@ -105,7 +105,7 @@ const ChargingHistory = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Charging History</h1>
+          <h1 className="text-2xl font-bold text-secondary-900 ml-4">Charging History</h1>
           <p className="text-secondary-500 mt-1">View your past charging sessions and reports</p>
         </div>
         <Button variant="outline" icon={Download}>
@@ -116,7 +116,7 @@ const ChargingHistory = () => {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
                 <Zap className="w-6 h-6 text-primary-600" />
@@ -128,7 +128,7 @@ const ChargingHistory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -140,7 +140,7 @@ const ChargingHistory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
                 <Battery className="w-6 h-6 text-blue-600" />
@@ -152,7 +152,7 @@ const ChargingHistory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
                 <Clock className="w-6 h-6 text-purple-600" />
@@ -164,7 +164,7 @@ const ChargingHistory = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-5 border border-secondary-100">
+          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
                 <Leaf className="w-6 h-6 text-emerald-600" />

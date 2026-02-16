@@ -93,7 +93,7 @@ This usually means:
 ### Database connection errors
 1. Check if MongoDB Atlas cluster is paused
 2. Verify the MONGODB_URI in .env file
-3. Run `python test_mongo_connection.py` to diagnose
+3. Run `python test_database.py` to diagnose
 
 ### Server won't start on port 5000
 Kill any existing processes:

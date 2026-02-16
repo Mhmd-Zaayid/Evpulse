@@ -49,7 +49,7 @@ EVPulse is a comprehensive EV charging station management system that connects:
 |------------|---------|---------|
 | Python | 3.9+ | Programming language |
 | Flask | 3.0.0 | Web framework |
-| Flask-PyMongo | 2.3.0 | MongoDB integration |
+| PyMongo | 4.6.1 | MongoDB driver |
 | Flask-JWT-Extended | 4.6.0 | JWT authentication |
 | Flask-CORS | 4.0.0 | Cross-origin requests |
 | bcrypt | 4.1.2 | Password hashing |
@@ -58,10 +58,10 @@ EVPulse is a comprehensive EV charging station management system that connects:
 ### Frontend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| React | 18.x | UI framework |
-| Vite | 5.x | Build tool |
+| React | 19.x | UI framework |
+| Vite | 7.x | Build tool |
 | Tailwind CSS | 3.x | Styling |
-| React Router | 6.x | Routing |
+| React Router | 7.x | Routing |
 | Recharts | 2.x | Charts/graphs |
 | Lucide React | - | Icons |
 
@@ -83,9 +83,16 @@ EVPulse/
 ├── backend/                  # Flask API Server
 │   ├── app.py               # Main application entry
 │   ├── config.py            # Configuration classes
+│   ├── start_server.py      # Server startup script
+│   ├── test_database.py     # Database connection test
 │   ├── requirements.txt     # Python dependencies
 │   ├── .env.example         # Environment template
 │   ├── .env                 # Your environment file (create this)
+│   │
+│   ├── database/            # Database connection & config
+│   │   ├── __init__.py
+│   │   ├── connection.py    # MongoDB connection manager
+│   │   └── config.py        # Database configuration
 │   │
 │   ├── models/              # Database models
 │   │   ├── __init__.py
@@ -220,7 +227,7 @@ pip install -r requirements.txt
 
 This installs all the packages listed in `requirements.txt`:
 - Flask (web framework)
-- Flask-PyMongo (MongoDB connection)
+- PyMongo (MongoDB driver)
 - Flask-JWT-Extended (authentication)
 - Flask-CORS (cross-origin requests)
 - bcrypt (password hashing)
@@ -246,10 +253,13 @@ SECRET_KEY=your-super-secret-key-change-this-in-production
 
 # MongoDB Connection
 # Option A: MongoDB Atlas (Cloud)
-MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/evpulse?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/evpulse?retryWrites=true&w=majority
 
 # Option B: Local MongoDB
-# MONGO_URI=mongodb://localhost:27017/evpulse
+# MONGODB_URI=mongodb://localhost:27017/evpulse
+
+# App specific
+MONGODB_DATABASE=evpulse
 
 # JWT Settings
 JWT_SECRET_KEY=your-jwt-secret-key-change-this-too
@@ -282,17 +292,16 @@ This creates:
 ### Step 6: Start the Flask Server
 
 ```powershell
-# Method 1: Using flask command
-flask run
-
-# Method 2: Using python directly
-python app.py
+# Use the startup script (Recommended)
+python start_server.py
 ```
 
 You should see:
 ```
- * Running on http://127.0.0.1:5000
- * Debug mode: on
+Starting EVPulse API server...
+Server will be available at http://localhost:5000
+Press Ctrl+C to stop the server
+ * Running on http://0.0.0.0:5000
 ```
 
 ### ✅ Backend is now running at `http://localhost:5000`
@@ -388,9 +397,10 @@ The application uses these collections (created automatically):
 | `FLASK_APP` | Entry point file | `app.py` |
 | `FLASK_ENV` | Environment mode | `development` or `production` |
 | `FLASK_DEBUG` | Enable debug mode | `True` or `False` |
+| `SECRET_KEY` | Flask secret key | Ran1` or `0` |
 | `SECRET_KEY` | Flask secret key | Random string |
-| `MONGO_URI` | MongoDB connection string | `mongodb+srv://...` |
-| `JWT_SECRET_KEY` | JWT signing key | Random string |
+| `MONGODB_URI` | MongoDB connection string | `mongodb+srv://...` |
+| `MONGODB_DATABASE` | Database name | `evpulse
 | `JWT_ACCESS_TOKEN_EXPIRES` | Token expiry (seconds) | `86400` (24 hours) |
 
 ### Frontend
@@ -546,10 +556,11 @@ pip install -r requirements.txt
 ```
 
 #### 5. MongoDB connection error
-**Solution**:
-- Check your MONGO_URI in `.env` file
+**Solution**:`MONGODB_URI` in `.env` file
 - Ensure your IP is whitelisted in MongoDB Atlas
 - Check your username/password
+- Make sure MongoDB is running (if local)
+- Run the diagnostics script: `python test_database.py --diagnostics`
 - Make sure MongoDB is running (if local)
 
 #### 6. "Address already in use" (Port 5000)

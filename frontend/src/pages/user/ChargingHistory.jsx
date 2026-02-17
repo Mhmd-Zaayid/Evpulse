@@ -116,62 +116,62 @@ const ChargingHistory = () => {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
-                <Zap className="w-6 h-6 text-primary-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-green-900" />
               </div>
               <div>
-                <p className="text-sm text-secondary-500">Total Energy</p>
-                <p className="text-xl font-bold text-secondary-900">{formatEnergy(stats.totalEnergy)}</p>
+                <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Total Energy</p>
+                <p className="text-xl font-bold text-white drop-shadow-md">{formatEnergy(stats.totalEnergy)}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-green-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-green-900" />
               </div>
               <div>
-                <p className="text-sm text-secondary-500">Total Spent</p>
-                <p className="text-xl font-bold text-secondary-900">{formatCurrency(stats.totalCost)}</p>
+                <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Total Spent</p>
+                <p className="text-xl font-bold text-white drop-shadow-md">{formatCurrency(stats.totalCost)}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                <Battery className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                <Battery className="w-6 h-6 text-green-900" />
               </div>
               <div>
-                <p className="text-sm text-secondary-500">Total Sessions</p>
-                <p className="text-xl font-bold text-secondary-900">{stats.totalSessions}</p>
+                <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Total Sessions</p>
+                <p className="text-xl font-bold text-white drop-shadow-md">{stats.totalSessions}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-green-900" />
               </div>
               <div>
-                <p className="text-sm text-secondary-500">Avg. Duration</p>
-                <p className="text-xl font-bold text-secondary-900">{formatDuration(stats.avgSessionDuration)}</p>
+                <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Avg. Duration</p>
+                <p className="text-xl font-bold text-white drop-shadow-md">{formatDuration(stats.avgSessionDuration)}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl shadow-sm p-5 border border-secondary-100" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-emerald-600" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                <Leaf className="w-6 h-6 text-green-900" />
               </div>
               <div>
-                <p className="text-sm text-secondary-500">CO₂ Saved</p>
-                <p className="text-xl font-bold text-secondary-900">{stats.co2Saved} kg</p>
+                <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">CO₂ Saved</p>
+                <p className="text-xl font-bold text-white drop-shadow-md">{stats.co2Saved} kg</p>
               </div>
             </div>
           </div>

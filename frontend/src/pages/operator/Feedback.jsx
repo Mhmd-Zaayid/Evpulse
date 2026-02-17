@@ -125,16 +125,16 @@ const Feedback = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Average Rating</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
+              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Average Rating</p>
+              <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
                 {feedbackData?.stats?.averageRating || 0}
               </p>
             </div>
-            <div className={`p-3 rounded-full ${getRatingColor(feedbackData?.stats?.averageRating || 0)}`}>
-              <Star className="h-6 w-6" />
+            <div className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30">
+              <Star className="h-6 w-6 text-green-900" />
             </div>
           </div>
           <div className="flex items-center mt-2">
@@ -142,53 +142,53 @@ const Feedback = () => {
           </div>
         </div>
 
-        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Reviews</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
+              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Total Reviews</p>
+              <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
                 {feedbackData?.stats?.totalReviews || 0}
               </p>
             </div>
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-              <MessageSquare className="h-6 w-6" />
+            <div className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30">
+              <MessageSquare className="h-6 w-6 text-green-900" />
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-emerald-100/70 mt-2 drop-shadow-sm">
             +{feedbackData?.stats?.thisMonthReviews || 0} this month
           </p>
         </div>
 
-        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Positive Reviews</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
+              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Positive Reviews</p>
+              <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
                 {feedbackData?.stats?.positiveReviews || 0}%
               </p>
             </div>
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
-              <TrendingUp className="h-6 w-6" />
+            <div className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30">
+              <TrendingUp className="h-6 w-6 text-green-900" />
             </div>
           </div>
-          <p className="text-sm text-green-600 mt-2">
+          <p className="text-sm text-emerald-200 mt-2 drop-shadow-sm">
             Satisfaction rate
           </p>
         </div>
 
-        <div className="rounded-xl p-6 shadow-sm border border-gray-100" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Issues Resolved</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
+              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Issues Resolved</p>
+              <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
                 {feedbackData?.stats?.resolvedIssues || 0}
               </p>
             </div>
-            <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-              <CheckCircle className="h-6 w-6" />
+            <div className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30">
+              <CheckCircle className="h-6 w-6 text-green-900" />
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-emerald-100/70 mt-2 drop-shadow-sm">
             {feedbackData?.stats?.pendingIssues || 0} pending
           </p>
         </div>

@@ -157,40 +157,40 @@ const Bookings = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="card bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 border border-green-500/20 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Calendar className="w-6 h-6 text-green-900" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{upcomingBookings.length}</p>
-              <p className="text-sm text-secondary-500">Upcoming</p>
+              <p className="text-2xl font-bold text-white drop-shadow-md">{upcomingBookings.length}</p>
+              <p className="text-sm text-emerald-100/80 drop-shadow-sm">Upcoming</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="card bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 border border-green-500/20 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <Zap className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Zap className="w-6 h-6 text-green-900" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">
+              <p className="text-2xl font-bold text-white drop-shadow-md">
                 {bookings.filter(b => b.status === 'completed').length}
               </p>
-              <p className="text-sm text-secondary-500">Completed</p>
+              <p className="text-sm text-emerald-100/80 drop-shadow-sm">Completed</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="card bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 border border-green-500/20 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <Clock className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Clock className="w-6 h-6 text-green-900" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">
+              <p className="text-2xl font-bold text-white drop-shadow-md">
                 {formatCurrency(bookings.reduce((sum, b) => sum + b.estimatedCost, 0))}
               </p>
-              <p className="text-sm text-secondary-500">Total Bookings Value</p>
+              <p className="text-sm text-emerald-100/80 drop-shadow-sm">Total Bookings Value</p>
             </div>
           </div>
         </div>

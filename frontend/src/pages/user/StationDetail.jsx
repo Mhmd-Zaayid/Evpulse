@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { stationsAPI, bookingsAPI, reviewsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
+import { getAiChargingOptimization, isAiConfigured } from '../../services/aiService';
 import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime } from '../../utils';
 import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
 import { useNotifications, useAuth } from '../../context';
@@ -26,6 +27,9 @@ import {
   TrendingUp,
   Info,
   MessageSquare,
+  Sparkles,
+  RefreshCw,
+  Settings2,
 } from 'lucide-react';
 
 const StationDetail = () => {
@@ -50,6 +54,13 @@ const StationDetail = () => {
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [slotEstimate, setSlotEstimate] = useState(null);
   const [waitTimeEstimate, setWaitTimeEstimate] = useState(null);
+
+  // AI states (neutral naming)
+  const [vehicleType, setVehicleType] = useState('Car');
+  const [batteryCapacity, setBatteryCapacity] = useState(60);
+  const [aiReport, setAiReport] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
   
   const [bookingData, setBookingData] = useState({
     date: '',
@@ -120,10 +131,10 @@ const StationDetail = () => {
     setAiRecommendation(recommendation);
 
     // Get slot duration estimate
-    const vehicleType = user?.vehicle?.make && user?.vehicle?.model 
+    const vType = user?.vehicle?.make && user?.vehicle?.model 
       ? `${user.vehicle.make} ${user.vehicle.model}` 
       : 'default';
-    const estimate = estimateSlotDuration(vehicleType, currentBattery, targetBattery, recommendation.type);
+    const estimate = estimateSlotDuration(vType, currentBattery, targetBattery, recommendation.type);
     setSlotEstimate(estimate);
 
     // Get waiting time estimate
@@ -131,7 +142,59 @@ const StationDetail = () => {
     const totalPorts = station.ports.length || 4;
     const waitTime = estimateWaitingTime(station?.id, 0, busyPorts, totalPorts);
     setWaitTimeEstimate(waitTime);
+
+    // Update battery capacity from user profile if available
+    if (user?.vehicle?.batteryCapacity) {
+      setBatteryCapacity(user.vehicle.batteryCapacity);
+    }
   };
+
+  // AI optimization (neutral naming)
+  const fetchAiOptimization = useCallback(async () => {
+    if (!station) return;
+
+    setAiLoading(true);
+    setAiError(null);
+
+    // Determine charger info from selected port or first available
+    const port = selectedPort || station.ports.find(p => p.status === 'available') || station.ports[0];
+    const chargerType = port?.type?.includes('DC') ? 'Fast' : 'Normal';
+    const chargerPower = port?.power || 22;
+    const costPerKwh = port?.price ? port.price * 84 : 8; // Convert USD to ₹ approx
+
+    const peakStart = station.peakHours?.start || '18:00';
+    const peakEnd = station.peakHours?.end || '21:00';
+    const formatTime12 = (t) => {
+      const [h, m] = t.split(':');
+      const hr = parseInt(h);
+      const ampm = hr >= 12 ? 'PM' : 'AM';
+      return `${hr > 12 ? hr - 12 : hr || 12}${m !== '00' ? ':' + m : ''} ${ampm}`;
+    };
+    const peakHoursStr = `${formatTime12(peakStart)} – ${formatTime12(peakEnd)}`;
+
+    try {
+      const result = await getAiChargingOptimization({
+        vehicleType,
+        batteryCapacity,
+        currentPercentage: currentBattery,
+        targetPercentage: targetBattery,
+        chargerType,
+        chargerPower,
+        costPerKwh: Math.round(costPerKwh * 100) / 100,
+        peakHours: peakHoursStr,
+      });
+
+      if (result.success) {
+        setAiReport(result.text);
+      } else {
+        setAiError(result.error);
+      }
+    } catch (err) {
+      setAiError(err.message || 'Failed to fetch AI optimization');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [station, selectedPort, vehicleType, batteryCapacity, currentBattery, targetBattery]);
 
   const handlePortSelect = (port) => {
     if (port.status === 'available') {
@@ -307,249 +370,187 @@ const StationDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* AI Smart Recommendations Card */}
+          {/* AI Smart Recommendations removed — replaced by AI Charging Optimization below */}
+
+          {/* AI Charging Optimization Report (moved up; themed like Smart Recommendations) */}
           <div className="card bg-gradient-to-br from-primary-50 to-blue-50 border-primary-200">
-            <div className="flex items-center gap-2 mb-4">
-              <Brain className="w-5 h-5 text-primary-600" />
-              <h2 className="text-lg font-semibold text-secondary-900">AI Smart Recommendations</h2>
-              <Badge variant="info" size="sm">AI Powered</Badge>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-violet-600" />
+                <h2 className="text-lg font-semibold text-secondary-900">AI Charging Optimization</h2>
+                <Badge variant="info" size="sm">AI</Badge>
+              </div>
+              <button
+                onClick={fetchAiOptimization}
+                disabled={aiLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${aiLoading ? 'animate-spin' : ''}`} />
+                {aiLoading ? 'Analyzing...' : aiReport ? 'Re-analyze' : 'Analyze'}
+              </button>
             </div>
 
-            {/* Battery Level Input */}
+            {/* Configuration Inputs */}
             <div className="mb-4 p-4 bg-white/60 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-secondary-700">Your Current Battery</span>
-                <span className="text-lg font-bold text-primary-600">{currentBattery}%</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs font-medium text-secondary-600 mb-1 block">Vehicle Type</label>
+                  <select
+                    value={vehicleType}
+                    onChange={(e) => setVehicleType(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-secondary-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
+                  >
+                    <option value="Car">Car</option>
+                    <option value="Bike">Bike</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-secondary-600 mb-1 block">Battery Capacity (kWh)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="200"
+                    value={batteryCapacity}
+                    onChange={(e) => setBatteryCapacity(parseInt(e.target.value) || 60)}
+                    className="w-full px-3 py-2 text-sm border border-secondary-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
+                  />
+                </div>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="95"
-                value={currentBattery}
-                onChange={(e) => setCurrentBattery(parseInt(e.target.value))}
-                className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer accent-primary-500"
-              />
-              <div className="flex justify-between text-xs text-secondary-500 mt-1">
-                <span>5%</span>
-                <span>Target: {targetBattery}%</span>
-                <span>95%</span>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-secondary-600 mb-1 block">Current Battery (%)</label>
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-secondary-500">5%</span>
+                      <span className="text-sm font-bold text-violet-600">{currentBattery}%</span>
+                      <span className="text-xs text-secondary-500">95%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="95"
+                      value={currentBattery}
+                      onChange={(e) => setCurrentBattery(parseInt(e.target.value))}
+                      className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-secondary-600 mb-1 block">Target Battery (%)</label>
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-secondary-500">10%</span>
+                      <span className="text-sm font-bold text-violet-600">{targetBattery}%</span>
+                      <span className="text-xs text-secondary-500">100%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      value={targetBattery}
+                      onChange={(e) => setTargetBattery(parseInt(e.target.value))}
+                      className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Charger Recommendation */}
-              {aiRecommendation && (
-                <div className="p-4 bg-white rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className={`w-5 h-5 ${aiRecommendation.type === 'Fast DC' ? 'text-amber-500' : 'text-blue-500'}`} />
-                    <span className="text-sm font-medium text-secondary-700">Recommended</span>
-                  </div>
-                  <p className="text-lg font-bold text-secondary-900">{aiRecommendation.type}</p>
-                  <p className="text-xs text-secondary-500 mt-1">{aiRecommendation.reason}</p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-600">{aiRecommendation.confidence}% confidence</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Slot Duration Estimate */}
-              {slotEstimate && (
-                <div className="p-4 bg-white rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Timer className="w-5 h-5 text-purple-500" />
-                    <span className="text-sm font-medium text-secondary-700">Est. Duration</span>
-                  </div>
-                  <p className="text-lg font-bold text-secondary-900">{slotEstimate.recommendedSlotDuration} min</p>
-                  <p className="text-xs text-secondary-500 mt-1">
-                    {slotEstimate.energyRequired} kWh needed
+            {/* API Key Warning */}
+            {!isAiConfigured() && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                <Settings2 className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-700">AI API Key Required</p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Add your API key to the backend .env as <code className="px-1 py-0.5 bg-amber-100 rounded text-amber-800">AI_API_KEY</code> or to frontend env as <code className="px-1 py-0.5 bg-amber-100 rounded text-amber-800">VITE_AI_API_KEY</code>.
                   </p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <Battery className="w-3 h-3 text-primary-500" />
-                    <span className="text-xs text-secondary-600">{currentBattery}% → {targetBattery}%</span>
-                  </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Waiting Time Estimate */}
-              {waitTimeEstimate && (
-                <div className="p-4 bg-white rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className={`w-5 h-5 ${
-                      waitTimeEstimate.status === 'high' ? 'text-red-500' : 
-                      waitTimeEstimate.status === 'medium' ? 'text-amber-500' : 'text-green-500'
-                    }`} />
-                    <span className="text-sm font-medium text-secondary-700">Wait Time</span>
-                  </div>
-                  <p className="text-lg font-bold text-secondary-900">
-                    {waitTimeEstimate.estimatedWaitMinutes === 0 
-                      ? 'No wait' 
-                      : `~${waitTimeEstimate.estimatedWaitMinutes} min`}
-                  </p>
-                  <p className="text-xs text-secondary-500 mt-1">{waitTimeEstimate.statusText}</p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <Info className="w-3 h-3 text-blue-500" />
-                    <span className="text-xs text-secondary-600">{waitTimeEstimate.availablePorts} ports available</span>
-                  </div>
+            {/* Error State */}
+            {aiError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{aiError}</p>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {aiLoading && (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="w-12 h-12 mb-3 relative">
+                  <Sparkles className="w-12 h-12 text-violet-400 animate-pulse" />
                 </div>
-              )}
-            </div>
+                <p className="text-sm font-medium text-violet-600">AI is analyzing your charging session...</p>
+                <p className="text-xs text-secondary-500 mt-1">This may take a few seconds</p>
+              </div>
+            )}
 
-            {waitTimeEstimate && waitTimeEstimate.estimatedWaitMinutes > 15 && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-700">{waitTimeEstimate.recommendation}</p>
+            {/* AI Report Results — rendered as formatted text */}
+            {aiReport && !aiLoading && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-3 bg-violet-100/60 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-violet-600" />
+                  <span className="text-sm font-semibold text-violet-800">⚡ AI Charging Optimization Report</span>
+                </div>
+                <div className="p-4 bg-white rounded-xl shadow-sm border border-violet-100">
+                  <p className="text-sm text-secondary-800 leading-relaxed whitespace-pre-wrap">{aiReport}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Initial Empty State */}
+            {!aiReport && !aiLoading && !aiError && (
+              <div className="text-center py-6">
+                <Sparkles className="w-10 h-10 text-violet-300 mx-auto mb-2" />
+                <p className="text-sm text-secondary-500">Click <strong>Analyze</strong> to get an AI-powered charging optimization report</p>
+                <p className="text-xs text-secondary-400 mt-1">Powered by AI</p>
               </div>
             )}
           </div>
 
-          {/* Charging Ports */}
-          <div className="card">
-            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Charging Ports</h2>
-            <div className="space-y-3">
-              {station.ports.map((port) => (
-                <div
-                  key={port.id}
-                  onClick={() => handlePortSelect(port)}
-                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    selectedPort?.id === port.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : port.status === 'available'
-                      ? 'border-secondary-200 hover:border-primary-300 hover:bg-secondary-50'
-                      : 'border-secondary-200 bg-secondary-50 opacity-60 cursor-not-allowed'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        port.status === 'available' ? 'bg-green-100' : 
-                        port.status === 'busy' ? 'bg-amber-100' : 'bg-secondary-200'
-                      }`}>
-                        <Zap className={`w-6 h-6 ${
-                          port.status === 'available' ? 'text-green-600' : 
-                          port.status === 'busy' ? 'text-amber-600' : 'text-secondary-400'
-                        }`} />
-                      </div>
-                      <div>
-                        <p className="font-medium text-secondary-900">Port #{port.id}</p>
-                        <p className="text-sm text-secondary-500">{port.type} • {port.power}kW</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={port.status === 'available' ? 'success' : port.status === 'busy' ? 'warning' : 'danger'}>
-                        {getStatusText(port.status)}
-                      </Badge>
-                      <p className="text-sm text-secondary-600 mt-1">
-                        {formatCurrency(port.price)}/kWh
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {selectedPort?.id === port.id && (
-                    <div className="mt-4 pt-4 border-t border-primary-200">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+            {/* Reviews */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-secondary-900 mb-4">Reviews</h2>
+              {reviews && reviews.length > 0 ? (
+                <div className="space-y-4">
+                  {reviews.slice(0, 3).map((review) => (
+                    <div key={review.id || review._id} className="p-4 bg-white rounded-xl shadow-sm">
+                      <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-secondary-500">Est. Time (50kWh)</p>
-                          <p className="font-medium">{calculateChargingTime(50, port.power)}</p>
+                          <span className="font-medium text-secondary-900">{review.userName}</span>
+                          <div className="flex mt-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 ${star <= review.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+                              />
+                            ))}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-secondary-500">Est. Cost</p>
-                          <p className="font-medium">{formatCurrency(50 * port.price)}</p>
-                        </div>
+                        <div className="text-sm text-secondary-500">{review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</div>
                       </div>
+                      <p className="text-sm text-secondary-600 mt-2">{review.comment}</p>
                     </div>
+                  ))}
+
+                  {reviews.length > 3 && (
+                    <Button variant="outline" fullWidth icon={MessageSquare}>
+                      View All {reviews.length} Reviews
+                    </Button>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Pricing */}
-          <div className="card">
-            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Pricing</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {station.pricing.normal && (
-                <div className="p-4 bg-secondary-50 rounded-xl">
-                  <h3 className="font-medium text-secondary-900 mb-2">Normal AC Charging</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-secondary-500">Base Rate</span>
-                      <span className="font-medium">{formatCurrency(station.pricing.normal.base)}/kWh</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-secondary-500">Peak Hours ({station.peakHours.start} - {station.peakHours.end})</span>
-                      <span className="font-medium">{formatCurrency(station.pricing.normal.peak)}/kWh</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {station.pricing.fast && (
-                <div className="p-4 bg-primary-50 rounded-xl">
-                  <h3 className="font-medium text-secondary-900 mb-2">Fast DC Charging</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-secondary-500">Base Rate</span>
-                      <span className="font-medium">{formatCurrency(station.pricing.fast.base)}/kWh</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-secondary-500">Peak Hours ({station.peakHours.start} - {station.peakHours.end})</span>
-                      <span className="font-medium">{formatCurrency(station.pricing.fast.peak)}/kWh</span>
-                    </div>
-                  </div>
+              ) : (
+                <div className="text-center py-6">
+                  <MessageSquare className="w-10 h-10 text-secondary-300 mx-auto mb-2" />
+                  <p className="text-secondary-500">No reviews yet</p>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Reviews Section */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-secondary-900">Reviews & Ratings</h2>
-              <RatingDisplay rating={station.rating} totalReviews={station.totalReviews} />
-            </div>
-            
-            {reviews.length > 0 ? (
-              <div className="space-y-4">
-                {reviews.slice(0, 3).map((review) => (
-                  <div key={review.id} className="p-4 bg-secondary-50 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                          <span className="text-primary-700 font-medium text-sm">
-                            {review.userName?.charAt(0)}
-                          </span>
-                        </div>
-                        <span className="font-medium text-secondary-900">{review.userName}</span>
-                      </div>
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`w-4 h-4 ${
-                              star <= review.rating
-                                ? 'text-amber-400 fill-amber-400'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-sm text-secondary-600">{review.comment}</p>
-                  </div>
-                ))}
-                {reviews.length > 3 && (
-                  <Button variant="outline" fullWidth icon={MessageSquare}>
-                    View All {reviews.length} Reviews
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <MessageSquare className="w-10 h-10 text-secondary-300 mx-auto mb-2" />
-                <p className="text-secondary-500">No reviews yet</p>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Sidebar */}

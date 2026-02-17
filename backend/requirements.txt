@@ -18,6 +18,9 @@ python-dotenv==1.0.0
 # SSL/TLS Support
 certifi>=2023.7.22
 
+# HTTP requests
+requests==2.31.0
+
 # Production Server
 gunicorn==21.2.0
 

@@ -7,7 +7,9 @@ Main Flask application with MongoDB database integration.
 import os
 import logging
 from datetime import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+import requests
+import json
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
@@ -341,6 +343,92 @@ def _register_routes(app: Flask) -> None:
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }), 500
+
+    # AI proxy endpoint to keep API keys server-side
+    @app.route('/api/ai/optimize', methods=['POST'])
+    def ai_optimize():
+        """Proxy endpoint that forwards optimization requests to the configured generative API using the server-side API key."""
+        try:
+            body = request.get_json() or {}
+
+            AI_API_KEY = os.getenv('AI_API_KEY')
+            if not AI_API_KEY:
+                return jsonify({'success': False, 'error': 'Server AI API key not configured.'}), 500
+
+            # Build a simple prompt from provided params (keep concise)
+            vehicleType = body.get('vehicleType', 'Car')
+            batteryCapacity = body.get('batteryCapacity', 60)
+            currentPercentage = body.get('currentPercentage', 35)
+            targetPercentage = body.get('targetPercentage', 80)
+            chargerType = body.get('chargerType', 'Fast')
+            chargerPower = body.get('chargerPower', 150)
+            costPerKwh = body.get('costPerKwh', 8)
+            peakHours = body.get('peakHours', '6 PM – 10 PM')
+
+            prompt = f"""You are an advanced AI-powered EV Charging Optimization Engine.
+
+Vehicle Type: {vehicleType}
+Battery Capacity (kWh): {batteryCapacity}
+Current Battery Level (%): {currentPercentage}
+Target Battery Level (%): {targetPercentage}
+Charger Type: {chargerType}
+Charger Power Output (kW): {chargerPower}
+Electricity Cost per kWh (₹): {costPerKwh}
+Peak Hours: {peakHours}
+
+Analyze the above and provide a clear, well-formatted charging optimization report. Include:
+1. Energy Required (kWh)
+2. Estimated Charging Time
+3. Estimated Cost (₹)
+4. Peak Hour Analysis
+5. Optimization Level (Low / Moderate / Highly Optimized)
+6. Smart Recommendation for battery health and cost savings
+
+Keep it concise, professional, and easy to read. Use plain text with clear headings. Do NOT use markdown code blocks or JSON format.""" 
+
+            AI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+
+            payload = {
+                'contents': [
+                    {
+                        'parts': [
+                            {
+                                'text': prompt
+                            }
+                        ]
+                    }
+                ],
+                'generationConfig': {
+                    'temperature': 0.7,
+                    'topK': 40,
+                    'topP': 0.95,
+                    'maxOutputTokens': 2048,
+                }
+            }
+
+            resp = requests.post(f"{AI_API_URL}?key={AI_API_KEY}", json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
+            if resp.status_code != 200:
+                try:
+                    err = resp.json()
+                except Exception:
+                    err = {'status': resp.status_code, 'text': resp.text}
+                return jsonify({'success': False, 'error': f'AI service error: {err}'}), 502
+
+            data = resp.json()
+            textContent = None
+            try:
+                textContent = data.get('candidates', [])[0].get('content', {}).get('parts', [])[0].get('text')
+            except Exception:
+                textContent = None
+
+            if not textContent:
+                return jsonify({'success': False, 'error': 'No content returned from AI service.'}), 502
+
+            # Return raw text directly — no JSON parsing needed
+            return jsonify({'success': True, 'data': {'text': textContent}})
+
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # Mock data flag (set to False to use real database)

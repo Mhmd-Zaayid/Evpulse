@@ -140,7 +140,7 @@ const Stations = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">My Stations</h1>
-          <p className="text-secondary-500 mt-1">Manage your charging stations and ports</p>
+          <p className="text-secondary-500 mt-1 ml-4">Manage your charging stations and ports</p>
         </div>
         <Button icon={Plus}>
           Add Station
@@ -235,9 +235,11 @@ const Stations = () => {
                     </>
                   )}
                 </div>
-                <p className="text-xs text-secondary-500 mt-2">
-                  Peak Hours: {station.peakHours.start} - {station.peakHours.end}
-                </p>
+                {station.peakHours && (
+                  <p className="text-xs text-secondary-500 mt-2">
+                    Peak Hours: {station.peakHours.start} - {station.peakHours.end}
+                  </p>
+                )}
               </div>
 
               {/* Ports Grid */}

@@ -39,7 +39,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
-  const [timeRange, setTimeRange] = useState('week');
 
   // Mock data for charts
   const revenueData = [
@@ -95,7 +94,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
-  }, [timeRange]);
+  }, []);
 
   const fetchStats = async () => {
     setLoading(true);
@@ -158,22 +157,7 @@ const Dashboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Admin Dashboard</h1>
-          <p className="text-secondary-500 mt-1">System overview and analytics</p>
-        </div>
-        <div className="flex items-center gap-2 bg-secondary-100 rounded-xl p-1">
-          {['day', 'week', 'month', 'year'].map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
-                timeRange === range
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-secondary-600 hover:text-secondary-900'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+          <p className="text-secondary-500 mt-1 ml-4">System overview and analytics</p>
         </div>
       </div>
 

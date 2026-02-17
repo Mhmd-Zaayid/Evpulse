@@ -513,6 +513,50 @@ const StationDetail = () => {
             )}
           </div>
 
+          {/* Available Charging Ports */}
+          <div className="card">
+            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Available Charging Ports</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {station.ports.map((port) => (
+                <button
+                  key={port.id}
+                  onClick={() => handlePortSelect(port)}
+                  disabled={port.status !== 'available'}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    selectedPort?.id === port.id
+                      ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200'
+                      : port.status === 'available'
+                        ? 'border-secondary-200 hover:border-primary-300 hover:bg-primary-50/50 cursor-pointer'
+                        : 'border-secondary-200 bg-secondary-50 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-secondary-900">Port #{port.id}</span>
+                    <Badge 
+                      variant={port.status === 'available' ? 'success' : port.status === 'busy' ? 'warning' : 'danger'}
+                      size="sm"
+                    >
+                      {getStatusText(port.status)}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-secondary-600">{port.type}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-secondary-500">{port.power}kW</span>
+                      <span className="text-sm font-medium text-primary-600">{formatCurrency(port.price)}/kWh</span>
+                    </div>
+                  </div>
+                  {selectedPort?.id === port.id && (
+                    <div className="mt-2 flex items-center gap-1 text-primary-600">
+                      <Check className="w-4 h-4" />
+                      <span className="text-xs font-medium">Selected</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
             {/* Reviews */}
             <div className="card">
               <h2 className="text-lg font-semibold text-secondary-900 mb-4">Reviews</h2>

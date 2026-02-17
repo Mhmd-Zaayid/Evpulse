@@ -148,7 +148,7 @@ const Bookings = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">My Bookings</h1>
-          <p className="text-secondary-500 mt-1">Manage your charging slot reservations</p>
+          <p className="text-secondary-500 mt-1 ml-4">Manage your charging slot reservations</p>
         </div>
         <Button icon={Plus} onClick={() => navigate('/user/stations')}>
           New Booking

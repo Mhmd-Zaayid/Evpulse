@@ -121,7 +121,7 @@ const Feedback = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 ml-4">Feedback Management</h1>
-          <p className="text-gray-600 mt-1">Review and moderate customer feedback across all stations</p>
+          <p className="text-gray-600 mt-1 ml-4">Review and moderate customer feedback across all stations</p>
         </div>
         <Button variant="outline" className="flex items-center gap-2">
           <Download className="h-4 w-4" />
@@ -130,7 +130,7 @@ const Feedback = () => {
       </div>
 
       {/* Platform Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
@@ -180,21 +180,6 @@ const Feedback = () => {
             </div>
           </div>
           <p className="text-sm text-yellow-200 mt-2 drop-shadow-sm">Requires moderation</p>
-        </div>
-
-        <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Flagged Reviews</p>
-              <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
-                {feedbackData?.stats?.flaggedReviews || 0}
-              </p>
-            </div>
-            <div className="p-3 rounded-full bg-gradient-to-br from-red-400 to-rose-300 shadow-lg shadow-red-500/30">
-              <Flag className="h-6 w-6 text-red-900" />
-            </div>
-          </div>
-          <p className="text-sm text-red-200 mt-2 drop-shadow-sm">Needs attention</p>
         </div>
 
         <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">

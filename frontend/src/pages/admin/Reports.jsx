@@ -33,7 +33,6 @@ import {
 const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month');
-  const [reportType, setReportType] = useState('overview');
 
   // Mock data
   const userGrowthData = [
@@ -94,7 +93,7 @@ const Reports = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Reports & Analytics</h1>
-          <p className="text-secondary-500 mt-1">Comprehensive system insights and metrics</p>
+          <p className="text-secondary-500 mt-1 ml-4">Comprehensive system insights and metrics</p>
         </div>
         <div className="flex items-center gap-3">
           <Select
@@ -111,29 +110,6 @@ const Reports = () => {
             Export Report
           </Button>
         </div>
-      </div>
-
-      {/* Report Type Tabs */}
-      <div className="flex flex-wrap gap-2 p-1 bg-secondary-100 rounded-xl w-fit">
-        {[
-          { value: 'overview', label: 'Overview', icon: BarChart3 },
-          { value: 'revenue', label: 'Revenue', icon: DollarSign },
-          { value: 'users', label: 'Users', icon: Users },
-          { value: 'energy', label: 'Energy', icon: Zap },
-        ].map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setReportType(tab.value)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              reportType === tab.value
-                ? 'bg-white text-primary-600 shadow-sm'
-                : 'text-secondary-600 hover:text-secondary-900'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* KPI Cards */}
@@ -191,10 +167,7 @@ const Reports = () => {
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {/* Energy and Regional Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Energy Consumption by Type */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -229,9 +202,6 @@ const Reports = () => {
             <h3 className="text-lg font-semibold text-secondary-900">Station Performance</h3>
             <p className="text-sm text-secondary-500">Top performing stations</p>
           </div>
-          <Button variant="ghost" size="sm" icon={FileText}>
-            Full Report
-          </Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">

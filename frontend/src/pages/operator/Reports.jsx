@@ -134,7 +134,7 @@ const Reports = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Reports & Analytics</h1>
-          <p className="text-secondary-500 mt-1">Comprehensive performance insights</p>
+          <p className="text-secondary-500 mt-1 ml-4">Comprehensive performance insights</p>
         </div>
         <div className="flex items-center gap-3">
           <Select

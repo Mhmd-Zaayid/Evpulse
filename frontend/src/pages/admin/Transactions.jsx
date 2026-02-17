@@ -215,7 +215,7 @@ const Transactions = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Transactions</h1>
-          <p className="text-secondary-500 mt-1">Monitor all financial transactions</p>
+          <p className="text-secondary-500 mt-1 ml-4">Monitor all financial transactions</p>
         </div>
         <Button icon={Download} onClick={handleExport}>
           Export Report

@@ -58,6 +58,11 @@ const Payments = () => {
     setProcessing(true);
     setShowTopUpModal(false);
     setShowPaymentModal(true);
+
+    // After 2 seconds, show success state
+    setTimeout(() => {
+      setProcessing(false);
+    }, 2000);
   };
 
   const handlePaymentComplete = async () => {
@@ -174,7 +179,7 @@ const Payments = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Payments & Wallet</h1>
-          <p className="text-secondary-500 mt-1">Manage your payments and transaction history</p>
+          <p className="text-secondary-500 mt-1 ml-4">Manage your payments and transaction history</p>
         </div>
         <div className="flex gap-3">
           <Button variant="secondary" icon={Download}>

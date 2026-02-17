@@ -150,7 +150,7 @@ const Sessions = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Charging Sessions</h1>
-          <p className="text-secondary-500 mt-1">Monitor active and completed sessions</p>
+          <p className="text-secondary-500 mt-1 ml-4">Monitor active and completed sessions</p>
         </div>
         <Button variant="secondary" icon={RefreshCw} onClick={handleRefresh}>
           Refresh

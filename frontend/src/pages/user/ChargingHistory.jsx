@@ -106,7 +106,7 @@ const ChargingHistory = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Charging History</h1>
-          <p className="text-secondary-500 mt-1">View your past charging sessions and reports</p>
+          <p className="text-secondary-500 mt-1 ml-4">View your past charging sessions and reports</p>
         </div>
         <Button variant="outline" icon={Download}>
           Export Report

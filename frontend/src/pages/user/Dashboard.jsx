@@ -90,7 +90,7 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">
             Welcome back, {user?.name?.split(' ')[0]}! 👋
           </h1>
-          <p className="text-secondary-500 mt-1">
+          <p className="text-secondary-500 mt-1 ml-4">
             Here's your EV charging overview
           </p>
         </div>

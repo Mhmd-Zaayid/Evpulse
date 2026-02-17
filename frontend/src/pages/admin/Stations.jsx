@@ -275,7 +275,7 @@ const Stations = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">Station Management</h1>
-          <p className="text-secondary-500 mt-1">Manage all charging stations</p>
+          <p className="text-secondary-500 mt-1 ml-4">Manage all charging stations</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" icon={Download}>

@@ -36,20 +36,6 @@ const Users = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Mock users data
-  const mockUsers = [
-    { id: 1, name: 'John Smith', email: 'john@example.com', phone: '+1 555-123-4567', role: 'user', status: 'active', createdAt: '2024-08-15', sessions: 45, spent: 325.50 },
-    { id: 2, name: 'Sarah Johnson', email: 'sarah@example.com', phone: '+1 555-234-5678', role: 'user', status: 'active', createdAt: '2024-09-20', sessions: 32, spent: 245.00 },
-    { id: 3, name: 'Mike Williams', email: 'mike@evcharging.com', phone: '+1 555-345-6789', role: 'operator', status: 'active', createdAt: '2024-07-10', sessions: 0, spent: 0, stations: 5 },
-    { id: 4, name: 'Emily Brown', email: 'emily@example.com', phone: '+1 555-456-7890', role: 'user', status: 'suspended', createdAt: '2024-10-05', sessions: 8, spent: 65.00 },
-    { id: 5, name: 'David Lee', email: 'david@greencharge.com', phone: '+1 555-567-8901', role: 'operator', status: 'active', createdAt: '2024-06-22', sessions: 0, spent: 0, stations: 12 },
-    { id: 6, name: 'Lisa Anderson', email: 'lisa@example.com', phone: '+1 555-678-9012', role: 'user', status: 'active', createdAt: '2024-11-12', sessions: 15, spent: 120.00 },
-    { id: 7, name: 'James Wilson', email: 'james@admin.com', phone: '+1 555-789-0123', role: 'admin', status: 'active', createdAt: '2024-01-01', sessions: 0, spent: 0 },
-    { id: 8, name: 'Anna Martinez', email: 'anna@example.com', phone: '+1 555-890-1234', role: 'user', status: 'inactive', createdAt: '2024-04-18', sessions: 3, spent: 28.50 },
-    { id: 9, name: 'Robert Taylor', email: 'robert@chargepoint.com', phone: '+1 555-901-2345', role: 'operator', status: 'pending', createdAt: '2024-12-01', sessions: 0, spent: 0, stations: 0 },
-    { id: 10, name: 'Jennifer Garcia', email: 'jennifer@example.com', phone: '+1 555-012-3456', role: 'user', status: 'active', createdAt: '2024-10-25', sessions: 28, spent: 198.00 },
-  ];
-
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -57,11 +43,28 @@ const Users = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUsers(mockUsers);
+      const response = await adminAPI.getAllUsers();
+      if (response?.success) {
+        const mappedUsers = (response.data || []).map((user) => ({
+          id: user.id,
+          name: user.name || 'Unknown User',
+          email: user.email || '',
+          phone: user.phone || 'N/A',
+          role: user.role || 'user',
+          status: user.isActive ? 'active' : 'inactive',
+          createdAt: user.joinedDate || null,
+          sessions: 0,
+          spent: 0,
+          stations: Array.isArray(user.stations) ? user.stations.length : 0,
+        }));
+        setUsers(mappedUsers);
+      } else {
+        setUsers([]);
+        showToast({ type: 'error', message: response?.error || 'Failed to fetch users' });
+      }
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      setUsers([]);
+      showToast({ type: 'error', message: 'Failed to fetch users' });
     } finally {
       setLoading(false);
     }
@@ -91,27 +94,24 @@ const Users = () => {
   };
 
   const handleConfirmDelete = async () => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
-      showToast({ type: 'success', message: 'User deleted successfully!' });
-      setShowDeleteModal(false);
-      setSelectedUser(null);
-    } catch (error) {
-      showToast({ type: 'error', message: 'Failed to delete user' });
-    }
+    showToast({ type: 'error', message: 'User deletion API is not available yet' });
+    setShowDeleteModal(false);
+    setSelectedUser(null);
   };
 
   const handleToggleStatus = async (user) => {
     const newStatus = user.status === 'active' ? 'suspended' : 'active';
     try {
-      setUsers(prev => prev.map(u => 
-        u.id === user.id ? { ...u, status: newStatus } : u
-      ));
-      showToast({ 
-        type: 'success', 
-        message: `User ${newStatus === 'active' ? 'activated' : 'suspended'} successfully!` 
-      });
+      const response = await adminAPI.updateUserStatus(user.id, newStatus);
+      if (response?.success) {
+        showToast({ 
+          type: 'success', 
+          message: `User ${newStatus === 'active' ? 'activated' : 'suspended'} successfully!` 
+        });
+        await fetchUsers();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to update user status' });
+      }
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to update user status' });
     }
@@ -119,10 +119,13 @@ const Users = () => {
 
   const handleApproveOperator = async (user) => {
     try {
-      setUsers(prev => prev.map(u => 
-        u.id === user.id ? { ...u, status: 'active' } : u
-      ));
-      showToast({ type: 'success', message: 'Operator approved successfully!' });
+      const response = await adminAPI.updateUserStatus(user.id, 'active');
+      if (response?.success) {
+        showToast({ type: 'success', message: 'Operator approved successfully!' });
+        await fetchUsers();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to approve operator' });
+      }
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to approve operator' });
     }

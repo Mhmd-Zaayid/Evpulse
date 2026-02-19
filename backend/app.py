@@ -336,11 +336,6 @@ Keep it concise, professional, and easy to read. Use plain text with clear headi
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
 
-
-# Mock data flag (set to False to use real database)
-USE_MOCK_DATA = False
-
-
 if __name__ == '__main__':
     app = create_app()
 

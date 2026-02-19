@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNotifications } from '../../context';
+import { adminAPI } from '../../services';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils';
 import { Button, Input, Select, Table, Badge, EmptyState, LoadingSpinner } from '../../components';
 import {
@@ -29,22 +30,6 @@ const Transactions = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  // Mock transactions data
-  const mockTransactions = [
-    { id: 'TXN001', userId: 1, userName: 'John Smith', type: 'charge', amount: 24.50, status: 'completed', stationName: 'Downtown Hub', paymentMethod: 'Credit Card', createdAt: '2026-01-25T14:30:00' },
-    { id: 'TXN002', userId: 2, userName: 'Sarah Johnson', type: 'charge', amount: 18.75, status: 'completed', stationName: 'Mall Parking A', paymentMethod: 'Wallet', createdAt: '2026-01-25T13:45:00' },
-    { id: 'TXN003', userId: 3, userName: 'Mike Williams', type: 'payout', amount: 1250.00, status: 'pending', stationName: '-', paymentMethod: 'Bank Transfer', createdAt: '2026-01-25T12:00:00' },
-    { id: 'TXN004', userId: 4, userName: 'Emily Brown', type: 'refund', amount: 15.00, status: 'completed', stationName: 'Tech Park Station', paymentMethod: 'Credit Card', createdAt: '2026-01-25T11:30:00' },
-    { id: 'TXN005', userId: 5, userName: 'David Lee', type: 'payout', amount: 2890.50, status: 'completed', stationName: '-', paymentMethod: 'Bank Transfer', createdAt: '2026-01-25T10:00:00' },
-    { id: 'TXN006', userId: 6, userName: 'Lisa Anderson', type: 'charge', amount: 32.00, status: 'completed', stationName: 'Airport Terminal', paymentMethod: 'Wallet', createdAt: '2026-01-25T09:15:00' },
-    { id: 'TXN007', userId: 7, userName: 'James Wilson', type: 'topup', amount: 100.00, status: 'completed', stationName: '-', paymentMethod: 'Credit Card', createdAt: '2026-01-25T08:45:00' },
-    { id: 'TXN008', userId: 8, userName: 'Anna Martinez', type: 'charge', amount: 45.25, status: 'failed', stationName: 'Highway Rest Stop', paymentMethod: 'Credit Card', createdAt: '2026-01-24T22:30:00' },
-    { id: 'TXN009', userId: 9, userName: 'Robert Taylor', type: 'charge', amount: 28.00, status: 'completed', stationName: 'University Campus', paymentMethod: 'Wallet', createdAt: '2026-01-24T20:15:00' },
-    { id: 'TXN010', userId: 10, userName: 'Jennifer Garcia', type: 'refund', amount: 8.50, status: 'pending', stationName: 'City Hospital', paymentMethod: 'Wallet', createdAt: '2026-01-24T18:00:00' },
-    { id: 'TXN011', userId: 1, userName: 'John Smith', type: 'topup', amount: 50.00, status: 'completed', stationName: '-', paymentMethod: 'Credit Card', createdAt: '2026-01-24T16:30:00' },
-    { id: 'TXN012', userId: 2, userName: 'Sarah Johnson', type: 'charge', amount: 22.00, status: 'completed', stationName: 'Downtown Hub', paymentMethod: 'Credit Card', createdAt: '2026-01-24T15:00:00' },
-  ];
-
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -52,10 +37,26 @@ const Transactions = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setTransactions(mockTransactions);
+      const response = await adminAPI.getAllTransactions();
+      if (response?.success) {
+        const mappedTransactions = (response.data || []).map((txn) => ({
+          id: txn.id,
+          userId: txn.userId || 'N/A',
+          type: txn.type || 'charging',
+          amount: Number(txn.amount || 0),
+          status: txn.status || 'pending',
+          paymentMethod: txn.paymentMethod || 'N/A',
+          timestamp: txn.timestamp || null,
+          sessionId: txn.sessionId || 'N/A',
+        }));
+        setTransactions(mappedTransactions);
+      } else {
+        setTransactions([]);
+        showToast({ type: 'error', message: response?.error || 'Failed to fetch transactions' });
+      }
     } catch (error) {
-      console.error('Failed to fetch transactions:', error);
+      setTransactions([]);
+      showToast({ type: 'error', message: 'Failed to fetch transactions' });
     } finally {
       setLoading(false);
     }
@@ -63,10 +64,21 @@ const Transactions = () => {
 
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = txn.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         txn.userName.toLowerCase().includes(searchQuery.toLowerCase());
+                         txn.userId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || txn.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || txn.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
+    const createdAt = txn.timestamp ? new Date(txn.timestamp) : null;
+    const now = new Date();
+    const matchesDate = dateRange === 'all' || !createdAt || (
+      dateRange === 'today'
+        ? createdAt.toDateString() === now.toDateString()
+        : dateRange === 'week'
+          ? (now - createdAt) / (1000 * 60 * 60 * 24) <= 7
+          : dateRange === 'month'
+            ? createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear()
+            : true
+    );
+    return matchesSearch && matchesType && matchesStatus && matchesDate;
   });
 
   const paginatedTransactions = filteredTransactions.slice(
@@ -79,23 +91,24 @@ const Transactions = () => {
   };
 
   const handleRefund = (txn) => {
-    showToast({ type: 'success', message: `Refund initiated for ${txn.id}` });
+    showToast({ type: 'info', message: 'Refund API is not available yet' });
   };
 
   const getTypeBadge = (type) => {
     const config = {
-      charge: { variant: 'success', icon: ArrowDownLeft },
-      topup: { variant: 'info', icon: ArrowDownLeft },
+      charging: { variant: 'success', icon: ArrowDownLeft },
+      wallet_topup: { variant: 'info', icon: ArrowDownLeft },
       refund: { variant: 'warning', icon: ArrowUpRight },
       payout: { variant: 'secondary', icon: ArrowUpRight },
     };
-    const Icon = config[type].icon;
+    const typeConfig = config[type] || { variant: 'secondary', icon: ArrowUpRight };
+    const Icon = typeConfig.icon;
     return (
       <div className="flex items-center gap-2">
         <Icon className={`w-4 h-4 ${
-          type === 'charge' || type === 'topup' ? 'text-green-500' : 'text-amber-500'
+          type === 'charging' || type === 'wallet_topup' ? 'text-green-500' : 'text-amber-500'
         }`} />
-        <Badge variant={config[type].variant}>{type}</Badge>
+        <Badge variant={typeConfig.variant}>{type}</Badge>
       </div>
     );
   };
@@ -119,12 +132,12 @@ const Transactions = () => {
       ),
     },
     {
-      key: 'userName',
+      key: 'userId',
       label: 'User',
       render: (value, row) => (
         <div>
           <p className="font-medium text-secondary-900">{value}</p>
-          <p className="text-sm text-secondary-500">{row.stationName !== '-' ? row.stationName : 'N/A'}</p>
+          <p className="text-sm text-secondary-500">Session: {row.sessionId}</p>
         </div>
       ),
     },
@@ -138,9 +151,9 @@ const Transactions = () => {
       label: 'Amount',
       render: (value, row) => (
         <span className={`font-semibold ${
-          row.type === 'charge' || row.type === 'topup' ? 'text-green-600' : 'text-secondary-900'
+          row.type === 'charging' || row.type === 'wallet_topup' ? 'text-green-600' : 'text-secondary-900'
         }`}>
-          {row.type === 'refund' || row.type === 'payout' ? '-' : '+'}{formatCurrency(value)}
+          {row.type === 'refund' || row.type === 'payout' ? '-' : '+'}{formatCurrency(value || 0)}
         </span>
       ),
     },
@@ -160,12 +173,12 @@ const Transactions = () => {
       render: (value) => getStatusBadge(value),
     },
     {
-      key: 'createdAt',
+      key: 'timestamp',
       label: 'Date',
       render: (value) => (
         <div>
-          <p className="text-secondary-900">{formatDate(value)}</p>
-          <p className="text-sm text-secondary-500">{new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          <p className="text-secondary-900">{value ? formatDate(value) : '-'}</p>
+          <p className="text-sm text-secondary-500">{value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
         </div>
       ),
     },
@@ -180,7 +193,7 @@ const Transactions = () => {
           >
             <Eye className="w-4 h-4" />
           </button>
-          {row.type === 'charge' && row.status === 'completed' && (
+          {row.type === 'charging' && row.status === 'completed' && (
             <button
               onClick={() => handleRefund(row)}
               className="p-2 text-secondary-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
@@ -195,7 +208,7 @@ const Transactions = () => {
   ];
 
   const stats = {
-    totalRevenue: transactions.filter(t => t.type === 'charge' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0),
+    totalRevenue: transactions.filter(t => t.type === 'charging' && t.status === 'completed').reduce((acc, t) => acc + t.amount, 0),
     totalPayouts: transactions.filter(t => t.type === 'payout').reduce((acc, t) => acc + t.amount, 0),
     totalRefunds: transactions.filter(t => t.type === 'refund').reduce((acc, t) => acc + t.amount, 0),
     pendingCount: transactions.filter(t => t.status === 'pending').length,
@@ -288,8 +301,8 @@ const Transactions = () => {
               className="w-36"
             >
               <option value="all">All Types</option>
-              <option value="charge">Charges</option>
-              <option value="topup">Top-ups</option>
+              <option value="charging">Charging</option>
+              <option value="wallet_topup">Top-ups</option>
               <option value="refund">Refunds</option>
               <option value="payout">Payouts</option>
             </Select>

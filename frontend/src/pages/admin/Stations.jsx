@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNotifications } from '../../context';
+import { adminAPI } from '../../services';
 import { formatCurrency, formatDate } from '../../utils';
 import { Button, Input, Select, Modal, Table, Badge, EmptyState, LoadingSpinner } from '../../components';
 import {
@@ -33,26 +34,8 @@ const Stations = () => {
   const [selectedStation, setSelectedStation] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Mock stations data
-  const mockStations = [
-    { id: 1, name: 'Downtown Hub', address: '123 Main St, City Center', operator: 'EV Charge Inc', operatorId: 1, status: 'online', ports: 8, activePorts: 6, totalSessions: 1250, revenue: 15680, rating: 4.8 },
-    { id: 2, name: 'Mall Parking A', address: '456 Shopping Ave, West Mall', operator: 'GreenCharge', operatorId: 2, status: 'online', ports: 12, activePorts: 10, totalSessions: 2340, revenue: 28450, rating: 4.5 },
-    { id: 3, name: 'Highway Rest Stop', address: 'I-95 Mile 125, North', operator: 'FastCharge Co', operatorId: 3, status: 'maintenance', ports: 6, activePorts: 0, totalSessions: 890, revenue: 12340, rating: 4.2 },
-    { id: 4, name: 'Tech Park Station', address: '789 Innovation Dr, Tech District', operator: 'EV Charge Inc', operatorId: 1, status: 'online', ports: 10, activePorts: 8, totalSessions: 1890, revenue: 22100, rating: 4.7 },
-    { id: 5, name: 'Airport Terminal', address: 'Airport Rd, Terminal 3', operator: 'AirCharge', operatorId: 4, status: 'online', ports: 20, activePorts: 15, totalSessions: 4560, revenue: 56780, rating: 4.6 },
-    { id: 6, name: 'University Campus', address: '321 College St, Campus Center', operator: 'GreenCharge', operatorId: 2, status: 'offline', ports: 4, activePorts: 0, totalSessions: 560, revenue: 6780, rating: 4.3 },
-    { id: 7, name: 'City Hospital', address: '555 Healthcare Blvd', operator: 'MedCharge', operatorId: 5, status: 'online', ports: 6, activePorts: 4, totalSessions: 780, revenue: 9450, rating: 4.4 },
-    { id: 8, name: 'Sports Arena', address: '100 Stadium Way', operator: 'FastCharge Co', operatorId: 3, status: 'pending', ports: 16, activePorts: 0, totalSessions: 0, revenue: 0, rating: 0 },
-  ];
-
-  const operators = [
-    { id: 1, name: 'EV Charge Inc' },
-    { id: 2, name: 'GreenCharge' },
-    { id: 3, name: 'FastCharge Co' },
-    { id: 4, name: 'AirCharge' },
-    { id: 5, name: 'MedCharge' },
-  ];
+  const operators = [...new Map(stations.map((s) => [s.operatorId, { id: s.operatorId, name: s.operator || s.operatorId }])).values()]
+    .filter((operator) => operator.id);
 
   useEffect(() => {
     fetchStations();
@@ -61,10 +44,33 @@ const Stations = () => {
   const fetchStations = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setStations(mockStations);
+      const response = await adminAPI.getAllStations();
+      if (response?.success) {
+        const mappedStations = (response.data || []).map((station) => {
+          const ports = Array.isArray(station.ports) ? station.ports : [];
+          const activePorts = ports.filter((port) => port.status !== 'offline').length;
+          return {
+            id: station.id,
+            name: station.name || 'Unknown Station',
+            address: station.address || 'N/A',
+            operator: station.operatorName || station.operatorId || 'N/A',
+            operatorId: station.operatorId || '',
+            status: station.status || 'offline',
+            ports: ports.length,
+            activePorts,
+            totalSessions: 0,
+            revenue: 0,
+            rating: station.rating || 0,
+          };
+        });
+        setStations(mappedStations);
+      } else {
+        setStations([]);
+        showToast({ type: 'error', message: response?.error || 'Failed to fetch stations' });
+      }
     } catch (error) {
-      console.error('Failed to fetch stations:', error);
+      setStations([]);
+      showToast({ type: 'error', message: 'Failed to fetch stations' });
     } finally {
       setLoading(false);
     }
@@ -74,7 +80,7 @@ const Stations = () => {
     const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          station.address.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
-    const matchesOperator = operatorFilter === 'all' || station.operatorId === parseInt(operatorFilter);
+    const matchesOperator = operatorFilter === 'all' || station.operatorId === operatorFilter;
     return matchesSearch && matchesStatus && matchesOperator;
   });
 
@@ -94,27 +100,24 @@ const Stations = () => {
   };
 
   const handleConfirmDelete = async () => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setStations(prev => prev.filter(s => s.id !== selectedStation.id));
-      showToast({ type: 'success', message: 'Station deleted successfully!' });
-      setShowDeleteModal(false);
-      setSelectedStation(null);
-    } catch (error) {
-      showToast({ type: 'error', message: 'Failed to delete station' });
-    }
+    showToast({ type: 'error', message: 'Station deletion API is not available yet' });
+    setShowDeleteModal(false);
+    setSelectedStation(null);
   };
 
   const handleToggleStatus = async (station) => {
-    const newStatus = station.status === 'online' ? 'offline' : 'online';
+    const newStatus = station.status === 'offline' ? 'available' : 'offline';
     try {
-      setStations(prev => prev.map(s => 
-        s.id === station.id ? { ...s, status: newStatus, activePorts: newStatus === 'offline' ? 0 : s.ports } : s
-      ));
-      showToast({ 
-        type: 'success', 
-        message: `Station ${newStatus === 'online' ? 'brought online' : 'taken offline'} successfully!` 
-      });
+      const response = await adminAPI.updateStationStatus(station.id, newStatus);
+      if (response?.success) {
+        showToast({ 
+          type: 'success', 
+          message: `Station ${newStatus === 'offline' ? 'taken offline' : 'brought online'} successfully!` 
+        });
+        await fetchStations();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to update station status' });
+      }
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to update station status' });
     }
@@ -122,10 +125,13 @@ const Stations = () => {
 
   const handleApproveStation = async (station) => {
     try {
-      setStations(prev => prev.map(s => 
-        s.id === station.id ? { ...s, status: 'online', activePorts: s.ports } : s
-      ));
-      showToast({ type: 'success', message: 'Station approved and brought online!' });
+      const response = await adminAPI.updateStationStatus(station.id, 'available');
+      if (response?.success) {
+        showToast({ type: 'success', message: 'Station approved and brought online!' });
+        await fetchStations();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to approve station' });
+      }
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to approve station' });
     }
@@ -133,12 +139,12 @@ const Stations = () => {
 
   const getStatusBadge = (status) => {
     const variants = {
-      online: 'success',
+      available: 'success',
+      busy: 'warning',
       offline: 'danger',
       maintenance: 'warning',
-      pending: 'info',
     };
-    return <Badge variant={variants[status]}>{status}</Badge>;
+    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
   };
 
   const columns = [
@@ -217,24 +223,15 @@ const Stations = () => {
           >
             <Edit className="w-4 h-4" />
           </button>
-          {row.status === 'pending' && (
-            <button
-              onClick={() => handleApproveStation(row)}
-              className="p-2 text-secondary-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-              title="Approve"
-            >
-              <CheckCircle className="w-4 h-4" />
-            </button>
-          )}
-          {row.status !== 'pending' && row.status !== 'maintenance' && (
+          {row.status !== 'maintenance' && (
             <button
               onClick={() => handleToggleStatus(row)}
               className={`p-2 rounded-lg transition-colors ${
-                row.status === 'online'
+                row.status !== 'offline'
                   ? 'text-secondary-500 hover:text-red-600 hover:bg-red-50'
                   : 'text-secondary-500 hover:text-green-600 hover:bg-green-50'
               }`}
-              title={row.status === 'online' ? 'Take Offline' : 'Bring Online'}
+              title={row.status !== 'offline' ? 'Take Offline' : 'Bring Online'}
             >
               <Power className="w-4 h-4" />
             </button>
@@ -253,9 +250,9 @@ const Stations = () => {
 
   const stats = {
     total: stations.length,
-    online: stations.filter(s => s.status === 'online').length,
+    online: stations.filter(s => s.status === 'available' || s.status === 'busy').length,
     offline: stations.filter(s => s.status === 'offline').length,
-    pending: stations.filter(s => s.status === 'pending').length,
+    pending: 0,
     totalPorts: stations.reduce((acc, s) => acc + s.ports, 0),
     activePorts: stations.reduce((acc, s) => acc + s.activePorts, 0),
     totalRevenue: stations.reduce((acc, s) => acc + s.revenue, 0),
@@ -353,10 +350,9 @@ const Stations = () => {
               className="w-40"
             >
               <option value="all">All Status</option>
-              <option value="online">Online</option>
+              <option value="available">Available</option>
+              <option value="busy">Busy</option>
               <option value="offline">Offline</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="pending">Pending</option>
             </Select>
             <Select
               value={operatorFilter}
@@ -464,7 +460,8 @@ const Stations = () => {
                 defaultValue={selectedStation.ports}
               />
               <Select label="Status" defaultValue={selectedStation.status}>
-                <option value="online">Online</option>
+                <option value="available">Available</option>
+                <option value="busy">Busy</option>
                 <option value="offline">Offline</option>
                 <option value="maintenance">Maintenance</option>
               </Select>
@@ -483,7 +480,7 @@ const Stations = () => {
               <Button
                 fullWidth
                 onClick={() => {
-                  showToast({ type: 'success', message: 'Station updated successfully!' });
+                    showToast({ type: 'info', message: 'Station edit API is not available yet' });
                   setShowStationModal(false);
                   setSelectedStation(null);
                 }}

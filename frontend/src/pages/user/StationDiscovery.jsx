@@ -250,7 +250,7 @@ const StationDiscovery = () => {
               </div>
             </div>
 
-            {/* Mock Station Markers */}
+            {/* Station Markers */}
             {filteredStations.slice(0, 5).map((station, index) => {
               const positions = [
                 { top: '20%', left: '30%' },

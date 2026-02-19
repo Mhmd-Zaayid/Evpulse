@@ -434,8 +434,8 @@ const Settings = () => {
           </div>
           <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-xl">
             <div>
-              <p className="font-medium text-red-900">Reset Demo Data</p>
-              <p className="text-sm text-red-700">Restore all data to default state</p>
+              <p className="font-medium text-red-900">Reset Platform Data</p>
+              <p className="text-sm text-red-700">Permanently clear all application data</p>
             </div>
             <Button variant="danger" size="sm" onClick={() => setShowResetModal(true)}>
               Reset Data
@@ -520,7 +520,7 @@ const Settings = () => {
       <Modal
         isOpen={showResetModal}
         onClose={() => setShowResetModal(false)}
-        title="Reset Demo Data"
+        title="Reset Platform Data"
         size="sm"
       >
         <div className="space-y-4">
@@ -530,7 +530,7 @@ const Settings = () => {
               <div>
                 <p className="font-medium text-red-800">Warning</p>
                 <p className="text-sm text-red-700 mt-1">
-                  This will reset all data to the default demo state. This action cannot be undone.
+                  This will permanently delete all platform data. This action cannot be undone.
                 </p>
               </div>
             </div>
@@ -547,7 +547,7 @@ const Settings = () => {
               variant="danger"
               fullWidth
               onClick={() => {
-                showToast({ type: 'success', message: 'Demo data reset successfully!' });
+                showToast({ type: 'info', message: 'Data reset API is not available yet' });
                 setShowResetModal(false);
               }}
             >

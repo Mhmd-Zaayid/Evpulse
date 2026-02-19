@@ -26,6 +26,21 @@ const Stations = () => {
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showPortModal, setShowPortModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [creatingStation, setCreatingStation] = useState(false);
+
+  const [addData, setAddData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    operatingHours: '24/7',
+    image: '',
+    latitude: '',
+    longitude: '',
+    portCount: 2,
+    basePrice: 12,
+    peakPrice: 15,
+  });
   
   const [pricingData, setPricingData] = useState({
     normalBase: '',
@@ -65,10 +80,80 @@ const Stations = () => {
       normalPeak: station.pricing.normal?.peak || '',
       fastBase: station.pricing.fast?.base || '',
       fastPeak: station.pricing.fast?.peak || '',
-      peakStart: station.peakHours.start,
-      peakEnd: station.peakHours.end,
+      peakStart: station.peakHours?.start || '',
+      peakEnd: station.peakHours?.end || '',
     });
     setShowPricingModal(true);
+  };
+
+  const resetAddData = () => {
+    setAddData({
+      name: '',
+      address: '',
+      city: '',
+      operatingHours: '24/7',
+      image: '',
+      latitude: '',
+      longitude: '',
+      portCount: 2,
+      basePrice: 12,
+      peakPrice: 15,
+    });
+  };
+
+  const handleCreateStation = async () => {
+    if (!addData.name.trim() || !addData.address.trim() || !addData.city.trim()) {
+      showToast({ type: 'error', message: 'Name, address, and city are required' });
+      return;
+    }
+
+    setCreatingStation(true);
+    try {
+      const portCount = Math.max(1, Number(addData.portCount) || 1);
+      const basePrice = Number(addData.basePrice) || 0;
+      const peakPrice = Number(addData.peakPrice) || basePrice;
+      const latitude = addData.latitude === '' ? 0 : Number(addData.latitude);
+      const longitude = addData.longitude === '' ? 0 : Number(addData.longitude);
+
+      const ports = Array.from({ length: portCount }, (_, index) => ({
+        id: index + 1,
+        type: index % 2 === 0 ? 'fast' : 'normal',
+        power: index % 2 === 0 ? 60 : 22,
+        status: 'available',
+        price: index % 2 === 0 ? peakPrice : basePrice,
+      }));
+
+      const payload = {
+        name: addData.name.trim(),
+        address: addData.address.trim(),
+        city: addData.city.trim(),
+        coordinates: { lat: latitude, lng: longitude },
+        operatingHours: addData.operatingHours?.trim() || '24/7',
+        image: addData.image?.trim() || null,
+        amenities: [],
+        status: 'available',
+        ports,
+        pricing: {
+          normal: { base: basePrice, peak: peakPrice },
+          fast: { base: peakPrice, peak: peakPrice },
+        },
+        peakHours: { start: '18:00', end: '22:00' },
+      };
+
+      const response = await stationsAPI.create(payload);
+      if (response?.success) {
+        showToast({ type: 'success', message: 'Station added successfully!' });
+        setShowAddModal(false);
+        resetAddData();
+        await fetchStations();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to add station' });
+      }
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to add station' });
+    } finally {
+      setCreatingStation(false);
+    }
   };
 
   const handleEditStation = (station) => {
@@ -118,7 +203,7 @@ const Stations = () => {
   const handleTogglePort = async (stationId, portId, currentStatus) => {
     const newStatus = currentStatus === 'available' ? 'offline' : 'available';
     try {
-      await operatorAPI.updatePortStatus(portId, newStatus);
+      await operatorAPI.updatePortStatus(stationId, portId, newStatus);
       showToast({ type: 'success', message: `Port ${newStatus === 'available' ? 'enabled' : 'disabled'}` });
       fetchStations();
     } catch (error) {
@@ -142,7 +227,7 @@ const Stations = () => {
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">My Stations</h1>
           <p className="text-secondary-500 mt-1 ml-4">Manage your charging stations and ports</p>
         </div>
-        <Button icon={Plus}>
+        <Button icon={Plus} onClick={() => setShowAddModal(true)}>
           Add Station
         </Button>
       </div>
@@ -296,12 +381,115 @@ const Stations = () => {
           title="No stations yet"
           description="Add your first charging station to get started"
           action={
-            <Button icon={Plus}>
+            <Button icon={Plus} onClick={() => setShowAddModal(true)}>
               Add Station
             </Button>
           }
         />
       )}
+
+      {/* Add Station Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          resetAddData();
+        }}
+        title="Add Station"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Station Name"
+              value={addData.name}
+              onChange={(e) => setAddData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter station name"
+            />
+            <Input
+              label="City"
+              value={addData.city}
+              onChange={(e) => setAddData(prev => ({ ...prev, city: e.target.value }))}
+              placeholder="Enter city"
+            />
+          </div>
+          <Input
+            label="Address"
+            value={addData.address}
+            onChange={(e) => setAddData(prev => ({ ...prev, address: e.target.value }))}
+            placeholder="Enter full address"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Operating Hours"
+              value={addData.operatingHours}
+              onChange={(e) => setAddData(prev => ({ ...prev, operatingHours: e.target.value }))}
+              placeholder="e.g., 24/7"
+            />
+            <Input
+              label="Image URL (optional)"
+              value={addData.image}
+              onChange={(e) => setAddData(prev => ({ ...prev, image: e.target.value }))}
+              placeholder="https://..."
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Latitude (optional)"
+              type="number"
+              step="0.000001"
+              value={addData.latitude}
+              onChange={(e) => setAddData(prev => ({ ...prev, latitude: e.target.value }))}
+            />
+            <Input
+              label="Longitude (optional)"
+              type="number"
+              step="0.000001"
+              value={addData.longitude}
+              onChange={(e) => setAddData(prev => ({ ...prev, longitude: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Ports"
+              type="number"
+              min="1"
+              value={addData.portCount}
+              onChange={(e) => setAddData(prev => ({ ...prev, portCount: e.target.value }))}
+            />
+            <Input
+              label="Base Price (₹/kWh)"
+              type="number"
+              step="0.01"
+              value={addData.basePrice}
+              onChange={(e) => setAddData(prev => ({ ...prev, basePrice: e.target.value }))}
+            />
+            <Input
+              label="Peak Price (₹/kWh)"
+              type="number"
+              step="0.01"
+              value={addData.peakPrice}
+              onChange={(e) => setAddData(prev => ({ ...prev, peakPrice: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => {
+                setShowAddModal(false);
+                resetAddData();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button fullWidth onClick={handleCreateStation} loading={creatingStation}>
+              Add Station
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Pricing Modal */}
       <Modal

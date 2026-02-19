@@ -1,16 +1,60 @@
-# React + Vite
+# EVPulse Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite client for EVPulse.
 
-Currently, two official plugins are available:
+## Requirements
+- Node.js 18+
+- npm 9+
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Install
 
-## React Compiler
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Run (Development)
 
-## Expanding the ESLint configuration
+```bash
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Default dev URL: `http://localhost:5173`
+
+## Build
+
+```bash
+npm run build
+```
+
+## Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Environment Variable
+
+Optional `frontend/.env`:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+If omitted, the app defaults to `http://localhost:5000/api`.
+
+## App Structure
+
+- `src/App.jsx` — route definitions and protected route logic
+- `src/context/` — auth + notification providers
+- `src/pages/` — role-specific pages (`auth`, `user`, `operator`, `admin`)
+- `src/components/` — layout and reusable UI components
+- `src/services/api.js` — API client modules
+
+## Notes
+
+- Keep backend running while developing frontend features.
+- Login tokens are stored in browser `localStorage`.
+
+---
+
+Last updated: 2026-02-19

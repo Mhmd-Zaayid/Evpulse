@@ -55,8 +55,8 @@ class Transaction:
         """Convert to API response format"""
         return {
             'id': self.id if hasattr(self, 'id') else None,
-            'userId': self.user_id,
-            'sessionId': self.session_id,
+            'userId': str(self.user_id) if self.user_id else None,
+            'sessionId': str(self.session_id) if self.session_id else None,
             'amount': self.amount,
             'type': self.type,
             'paymentMethod': self.payment_method,

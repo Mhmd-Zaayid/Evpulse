@@ -34,37 +34,6 @@ const Reports = () => {
   const [dateRange, setDateRange] = useState('week');
   const [stats, setStats] = useState(null);
 
-  // Mock report data
-  const revenueData = [
-    { date: 'Mon', revenue: 245, sessions: 12 },
-    { date: 'Tue', revenue: 312, sessions: 15 },
-    { date: 'Wed', revenue: 287, sessions: 14 },
-    { date: 'Thu', revenue: 398, sessions: 18 },
-    { date: 'Fri', revenue: 421, sessions: 20 },
-    { date: 'Sat', revenue: 356, sessions: 17 },
-    { date: 'Sun', revenue: 289, sessions: 14 },
-  ];
-
-  const utilizationData = [
-    { name: 'Downtown Hub', utilization: 78 },
-    { name: 'Mall Parking', utilization: 65 },
-    { name: 'Highway Rest', utilization: 82 },
-    { name: 'Tech Park', utilization: 71 },
-    { name: 'Airport', utilization: 89 },
-  ];
-
-  const peakHoursData = [
-    { hour: '6AM', sessions: 5 },
-    { hour: '8AM', sessions: 18 },
-    { hour: '10AM', sessions: 22 },
-    { hour: '12PM', sessions: 28 },
-    { hour: '2PM', sessions: 25 },
-    { hour: '4PM', sessions: 32 },
-    { hour: '6PM', sessions: 35 },
-    { hour: '8PM', sessions: 20 },
-    { hour: '10PM', sessions: 12 },
-  ];
-
   useEffect(() => {
     fetchStats();
   }, [dateRange]);
@@ -88,37 +57,50 @@ const Reports = () => {
   const summaryStats = [
     {
       label: 'Total Revenue',
-      value: formatCurrency(2308),
-      change: '+12.5%',
+      value: formatCurrency(stats?.monthlyRevenue || 0),
+      change: '-',
       trend: 'up',
       icon: DollarSign,
       color: 'bg-green-100 text-green-600',
     },
     {
       label: 'Energy Delivered',
-      value: formatEnergy(1451),
-      change: '+8.3%',
+      value: formatEnergy(stats?.monthlyEnergy || 0),
+      change: '-',
       trend: 'up',
       icon: Zap,
       color: 'bg-blue-100 text-blue-600',
     },
     {
       label: 'Total Sessions',
-      value: '110',
-      change: '+15.2%',
+      value: String((stats?.sessionsByHour || []).reduce((sum, point) => sum + (point.sessions || 0), 0)),
+      change: '-',
       trend: 'up',
       icon: Users,
       color: 'bg-purple-100 text-purple-600',
     },
     {
       label: 'Avg Session Time',
-      value: '42 min',
-      change: '-5.1%',
+      value: `${stats?.averageSessionDuration || 0} min`,
+      change: '-',
       trend: 'down',
       icon: Clock,
       color: 'bg-amber-100 text-amber-600',
     },
   ];
+
+  const revenueData = (stats?.revenueByStation || []).map((item) => ({
+    date: item.station,
+    revenue: item.revenue,
+    sessions: 0,
+  }));
+
+  const utilizationData = (stats?.revenueByStation || []).map((item) => ({
+    name: item.station,
+    utilization: stats?.portUtilization || 0,
+  }));
+
+  const peakHoursData = stats?.sessionsByHour || [];
 
   if (loading) {
     return (

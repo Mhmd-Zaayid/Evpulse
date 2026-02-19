@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useNotifications } from '../../context';
 import { bookingsAPI } from '../../services';
-import { chargingStations } from '../../services/mockData';
 import { formatCurrency, formatDate, getStatusColor, getStatusText } from '../../utils';
 import { Button, Badge, Modal, Table, EmptyState, LoadingSpinner } from '../../components';
 import { Calendar, Clock, MapPin, Zap, X, ChevronRight, Plus } from 'lucide-react';
@@ -25,13 +24,7 @@ const Bookings = () => {
   const fetchBookings = async () => {
     try {
       const response = await bookingsAPI.getByUser(user.id);
-      const bookingsData = response.data || [];
-      // Enrich bookings with station data
-      const enrichedBookings = bookingsData.map(booking => ({
-        ...booking,
-        station: chargingStations.find(s => s.id === booking.stationId),
-      }));
-      setBookings(enrichedBookings);
+      setBookings(response.data || []);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
       setBookings([]);
@@ -67,8 +60,8 @@ const Bookings = () => {
             <Zap className="w-5 h-5 text-primary-600" />
           </div>
           <div>
-            <p className="font-medium text-secondary-900">{row.station?.name}</p>
-            <p className="text-sm text-secondary-500">{row.station?.address}</p>
+            <p className="font-medium text-secondary-900">{row.stationName || `Station ${row.stationId}`}</p>
+            <p className="text-sm text-secondary-500">{row.stationId}</p>
           </div>
         </div>
       ),
@@ -263,7 +256,7 @@ const Bookings = () => {
           
           {selectedBooking && (
             <div className="p-4 bg-secondary-50 rounded-xl">
-              <p className="font-medium text-secondary-900">{selectedBooking.station?.name}</p>
+              <p className="font-medium text-secondary-900">{selectedBooking.stationName || `Station ${selectedBooking.stationId}`}</p>
               <p className="text-sm text-secondary-500 mt-1">
                 {formatDate(selectedBooking.date)} • {selectedBooking.timeSlot}
               </p>

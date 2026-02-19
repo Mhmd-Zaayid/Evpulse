@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, g
 from database import get_db
 from models.station import Station
 from bson import ObjectId
 from datetime import datetime
 import math
+
+from routes.common import role_required, to_object_id, now_utc
 
 stations_bp = Blueprint('stations', __name__)
 
@@ -111,7 +112,11 @@ def get_stations_by_operator(operator_id):
         if db is None:
             return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
         
-        stations_data = list(db.stations.find({'operator_id': operator_id}))
+        op_oid = to_object_id(operator_id)
+        if not op_oid:
+            return jsonify({'success': False, 'error': 'Invalid operator id'}), 400
+
+        stations_data = list(db.stations.find({'operator_id': op_oid}))
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
         
         return jsonify({'success': True, 'data': stations})
@@ -119,21 +124,17 @@ def get_stations_by_operator(operator_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stations_bp.route('', methods=['POST'])
-@jwt_required()
+@role_required('operator', 'admin')
 def create_station():
     """Create a new station (operator/admin only)"""
     try:
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        user_id = get_jwt_identity()
-        user_data = db.users.find_one({'_id': ObjectId(user_id)})
-        
-        if not user_data or user_data.get('role') not in ['operator', 'admin']:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-        data = request.get_json()
+        db = g.db
+        user_id = g.current_user_id
+        data = request.get_json() or {}
+
+        for field in ['name', 'address', 'city']:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'{field} is required'}), 400
         
         station = Station(
             name=data['name'],
@@ -148,47 +149,53 @@ def create_station():
             peak_hours=data.get('peakHours'),
             image=data.get('image')
         )
+        station.created_at = now_utc()
+        station.updated_at = now_utc()
         
         result = db.stations.insert_one(station.to_dict())
         station.id = str(result.inserted_id)
         
-        return jsonify({'success': True, 'data': station.to_response_dict()}), 201
+        return jsonify({
+            'success': True,
+            'message': 'Station created successfully',
+            'data': station.to_response_dict()
+        }), 201
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stations_bp.route('/<station_id>', methods=['PUT'])
-@jwt_required()
+@role_required('operator', 'admin')
 def update_station(station_id):
     """Update a station"""
     try:
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        user_id = get_jwt_identity()
-        data = request.get_json()
+        db = g.db
+        user = g.current_user
+        data = request.get_json() or {}
         
         # Verify ownership or admin
-        station_data = db.stations.find_one({'_id': ObjectId(station_id)})
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        station_data = db.stations.find_one({'_id': station_oid})
         if not station_data:
             return jsonify({'success': False, 'error': 'Station not found'}), 404
-        
-        user_data = db.users.find_one({'_id': ObjectId(user_id)})
-        if station_data.get('operator_id') != user_id and user_data.get('role') != 'admin':
+
+        if station_data.get('operator_id') != user.get('_id') and user.get('role') != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         # Update allowed fields
         allowed_fields = ['name', 'address', 'city', 'status', 'amenities', 
                          'operating_hours', 'ports', 'pricing', 'peak_hours', 'image']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
-        update_data['updated_at'] = datetime.utcnow()
+        update_data['updated_at'] = now_utc()
         
         db.stations.update_one(
-            {'_id': ObjectId(station_id)},
+            {'_id': station_oid},
             {'$set': update_data}
         )
         
-        updated_station = db.stations.find_one({'_id': ObjectId(station_id)})
+        updated_station = db.stations.find_one({'_id': station_oid})
         station = Station.from_dict(updated_station)
         
         return jsonify({'success': True, 'data': station.to_response_dict()})
@@ -196,24 +203,30 @@ def update_station(station_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stations_bp.route('/<station_id>/status', methods=['PUT'])
-@jwt_required()
+@role_required('operator', 'admin')
 def update_station_status(station_id):
     """Update station status"""
     try:
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        user_id = get_jwt_identity()
-        data = request.get_json()
+        db = g.db
+        user = g.current_user
+        data = request.get_json() or {}
         new_status = data.get('status')
         
         if new_status not in ['available', 'busy', 'offline']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
         
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        if user.get('role') == 'operator':
+            station = db.stations.find_one({'_id': station_oid})
+            if not station or station.get('operator_id') != user.get('_id'):
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
         result = db.stations.update_one(
-            {'_id': ObjectId(station_id)},
-            {'$set': {'status': new_status, 'updated_at': datetime.utcnow()}}
+            {'_id': station_oid},
+            {'$set': {'status': new_status, 'updated_at': now_utc()}}
         )
         
         if result.modified_count == 0:
@@ -224,23 +237,30 @@ def update_station_status(station_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @stations_bp.route('/<station_id>/ports/<port_id>/status', methods=['PUT'])
-@jwt_required()
+@role_required('operator', 'admin')
 def update_port_status(station_id, port_id):
     """Update a specific port status"""
     try:
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        data = request.get_json()
+        db = g.db
+        user = g.current_user
+        data = request.get_json() or {}
         new_status = data.get('status')
         
         if new_status not in ['available', 'busy', 'offline']:
             return jsonify({'success': False, 'error': 'Invalid status'}), 400
         
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        if user.get('role') == 'operator':
+            station = db.stations.find_one({'_id': station_oid})
+            if not station or station.get('operator_id') != user.get('_id'):
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
         result = db.stations.update_one(
-            {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
-            {'$set': {'ports.$.status': new_status, 'updated_at': datetime.utcnow()}}
+            {'_id': station_oid, 'ports.id': int(port_id)},
+            {'$set': {'ports.$.status': new_status, 'updated_at': now_utc()}}
         )
         
         if result.modified_count == 0:

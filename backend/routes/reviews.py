@@ -5,6 +5,8 @@ from models.review import Review
 from bson import ObjectId
 from datetime import datetime
 
+from routes.common import to_object_id
+
 reviews_bp = Blueprint('reviews', __name__)
 
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
@@ -17,7 +19,11 @@ def get_station_reviews(station_id):
         if db is None:
             return jsonify(DB_UNAVAILABLE), 503
         
-        reviews_data = list(db.reviews.find({'station_id': station_id}).sort('timestamp', -1))
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        reviews_data = list(db.reviews.find({'station_id': station_oid}).sort('timestamp', -1))
         reviews = [Review.from_dict(data).to_response_dict() for data in reviews_data]
         
         return jsonify({'success': True, 'data': reviews})
@@ -43,16 +49,16 @@ def create_review():
         
         # Check if user already reviewed this station
         existing = db.reviews.find_one({
-            'station_id': data['stationId'],
-            'user_id': user_id
+            'station_id': to_object_id(data['stationId']),
+            'user_id': to_object_id(user_id)
         })
         
         if existing:
             return jsonify({'success': False, 'error': 'You have already reviewed this station'}), 400
         
         review = Review(
-            station_id=data['stationId'],
-            user_id=user_id,
+            station_id=to_object_id(data['stationId']),
+            user_id=to_object_id(user_id),
             user_name=user['name'],
             rating=data['rating'],
             comment=data.get('comment', '')
@@ -62,7 +68,7 @@ def create_review():
         review.id = str(result.inserted_id)
         
         # Update station rating
-        _update_station_rating(station_id=data['stationId'])
+        _update_station_rating(station_id=to_object_id(data['stationId']))
         
         return jsonify({'success': True, 'data': review.to_response_dict()}), 201
     except Exception as e:
@@ -77,12 +83,16 @@ def get_user_reviews(user_id):
         if db is None:
             return jsonify(DB_UNAVAILABLE), 503
         
-        reviews_data = list(db.reviews.find({'user_id': user_id}).sort('timestamp', -1))
+        target_user_id = to_object_id(user_id)
+        if not target_user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 400
+
+        reviews_data = list(db.reviews.find({'user_id': target_user_id}).sort('timestamp', -1))
         
         reviews = []
         for data in reviews_data:
             review = Review.from_dict(data)
-            station = db.stations.find_one({'_id': ObjectId(review.station_id)})
+            station = db.stations.find_one({'_id': to_object_id(review.station_id)})
             
             review_dict = review.to_response_dict()
             review_dict['stationName'] = station['name'] if station else 'Unknown Station'
@@ -130,7 +140,7 @@ def delete_review(review_id):
         
         # Check authorization
         user = db.users.find_one({'_id': ObjectId(user_id)})
-        if review['user_id'] != user_id and user.get('role') != 'admin':
+        if review['user_id'] != to_object_id(user_id) and user.get('role') != 'admin':
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         station_id = review['station_id']
@@ -155,7 +165,7 @@ def _update_station_rating(station_id):
         if reviews:
             avg_rating = sum(r['rating'] for r in reviews) / len(reviews)
             db.stations.update_one(
-                {'_id': ObjectId(station_id)},
+                {'_id': to_object_id(station_id)},
                 {'$set': {
                     'rating': round(avg_rating, 1),
                     'total_reviews': len(reviews)
@@ -163,7 +173,7 @@ def _update_station_rating(station_id):
             )
         else:
             db.stations.update_one(
-                {'_id': ObjectId(station_id)},
+                {'_id': to_object_id(station_id)},
                 {'$set': {'rating': 0, 'total_reviews': 0}}
             )
     except Exception as e:

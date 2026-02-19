@@ -32,31 +32,7 @@ const Maintenance = () => {
   const fetchAlerts = async () => {
     try {
       const response = await operatorAPI.getMaintenanceAlerts(user.id);
-      // Add some mock data for demonstration
-      const apiData = response?.data || [];
-      setAlerts([
-        ...apiData,
-        {
-          id: 3,
-          stationId: 2,
-          portId: 6,
-          type: 'warning',
-          message: 'Charging speed below optimal threshold',
-          priority: 'low',
-          timestamp: '2026-01-24T10:00:00',
-          status: 'resolved',
-        },
-        {
-          id: 4,
-          stationId: 1,
-          portId: 3,
-          type: 'scheduled',
-          message: 'Scheduled maintenance - cable replacement',
-          priority: 'medium',
-          timestamp: '2026-01-28T09:00:00',
-          status: 'scheduled',
-        },
-      ]);
+      setAlerts(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch alerts:', error);
     } finally {

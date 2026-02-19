@@ -5,6 +5,8 @@ from models.station import Station
 from bson import ObjectId
 from datetime import datetime, timedelta
 
+from routes.common import to_object_id, now_utc
+
 operator_bp = Blueprint('operator', __name__)
 
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
@@ -30,11 +32,13 @@ def get_operator_stats():
         if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        user_id = get_jwt_identity()
+        user_id = to_object_id(get_jwt_identity())
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 401
 
         # Get operator's stations
         stations = list(db.stations.find({'operator_id': user_id}))
-        station_ids = [str(s['_id']) for s in stations]
+        station_ids = [s['_id'] for s in stations]
         
         total_stations = len(stations)
         total_ports = sum(len(s.get('ports', [])) for s in stations)
@@ -46,7 +50,7 @@ def get_operator_stats():
         })
         
         # Today's stats
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
         today_sessions = list(db.sessions.find({
             'station_id': {'$in': station_ids},
             'start_time': {'$gte': today}
@@ -56,7 +60,7 @@ def get_operator_stats():
         today_energy = sum(s.get('energy_delivered', 0) for s in today_sessions)
         
         # Monthly stats
-        month_ago = datetime.utcnow() - timedelta(days=30)
+        month_ago = now_utc() - timedelta(days=30)
         month_sessions = list(db.sessions.find({
             'station_id': {'$in': station_ids},
             'start_time': {'$gte': month_ago}
@@ -97,27 +101,37 @@ def get_operator_stats():
                         'type': 'offline',
                         'message': f"Port {port['id']} is offline",
                         'priority': 'high',
-                        'timestamp': datetime.utcnow().isoformat()
+                        'timestamp': now_utc().isoformat()
                     })
         
         # Revenue by station
         revenue_by_station = []
         for station in stations:
-            station_sessions = [s for s in month_sessions if s.get('station_id') == str(station['_id'])]
+            station_sessions = [s for s in month_sessions if s.get('station_id') == station['_id']]
             station_revenue = sum(s.get('cost', 0) or 0 for s in station_sessions)
             revenue_by_station.append({
                 'station': station['name'],
                 'revenue': round(station_revenue, 2)
             })
         
-        # Sessions by hour (mock data for now)
+        # Sessions by hour (live data from today)
+        sessions_by_hour_map = {}
+        for session in today_sessions:
+            start_time = session.get('start_time')
+            if not start_time:
+                continue
+            hour_value = start_time.hour if hasattr(start_time, 'hour') else None
+            if hour_value is None:
+                continue
+            hour_label = start_time.strftime('%I%p').lstrip('0')
+            sessions_by_hour_map[hour_value] = {
+                'hour': hour_label,
+                'sessions': sessions_by_hour_map.get(hour_value, {}).get('sessions', 0) + 1
+            }
+
         sessions_by_hour = [
-            {'hour': '6AM', 'sessions': 12},
-            {'hour': '9AM', 'sessions': 28},
-            {'hour': '12PM', 'sessions': 35},
-            {'hour': '3PM', 'sessions': 42},
-            {'hour': '6PM', 'sessions': 58},
-            {'hour': '9PM', 'sessions': 32}
+            value
+            for _, value in sorted(sessions_by_hour_map.items(), key=lambda item: item[0])
         ]
         
         stats = {
@@ -150,7 +164,9 @@ def get_operator_stations():
         if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        user_id = get_jwt_identity()
+        user_id = to_object_id(get_jwt_identity())
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 401
         stations_data = list(db.stations.find({'operator_id': user_id}))
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
         
@@ -169,7 +185,9 @@ def update_pricing(station_id):
         if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        user_id = get_jwt_identity()
+        user_id = to_object_id(get_jwt_identity())
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 401
         
         # Verify ownership
         station = db.stations.find_one({'_id': ObjectId(station_id)})
@@ -186,7 +204,7 @@ def update_pricing(station_id):
             {'$set': {
                 'pricing': data.get('pricing', {}),
                 'peak_hours': data.get('peakHours'),
-                'updated_at': datetime.utcnow()
+                'updated_at': now_utc()
             }}
         )
         
@@ -213,7 +231,7 @@ def update_port_status(station_id, port_id):
         
         result = db.stations.update_one(
             {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
-            {'$set': {'ports.$.status': new_status, 'updated_at': datetime.utcnow()}}
+            {'$set': {'ports.$.status': new_status, 'updated_at': now_utc()}}
         )
         
         if result.modified_count == 0:
@@ -234,7 +252,9 @@ def get_maintenance_alerts():
         if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        user_id = get_jwt_identity()
+        user_id = to_object_id(get_jwt_identity())
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 401
         stations = list(db.stations.find({'operator_id': user_id}))
         
         alerts = []
@@ -249,7 +269,7 @@ def get_maintenance_alerts():
                         'type': 'offline',
                         'message': f"Port {port['id']} is offline - requires attention",
                         'priority': 'high',
-                        'timestamp': datetime.utcnow().isoformat()
+                        'timestamp': now_utc().isoformat()
                     })
         
         return jsonify({'success': True, 'data': alerts})
@@ -267,15 +287,17 @@ def get_operator_feedback():
         if not is_op:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        user_id = get_jwt_identity()
+        user_id = to_object_id(get_jwt_identity())
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 401
         stations = list(db.stations.find({'operator_id': user_id}))
         
         feedback = []
         for station in stations:
-            reviews = list(db.reviews.find({'station_id': str(station['_id'])}).sort('timestamp', -1).limit(5))
+            reviews = list(db.reviews.find({'station_id': station['_id']}).sort('timestamp', -1).limit(5))
             
             # Rating breakdown
-            all_reviews = list(db.reviews.find({'station_id': str(station['_id'])}))
+            all_reviews = list(db.reviews.find({'station_id': station['_id']}))
             rating_breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
             for r in all_reviews:
                 rating = r.get('rating', 0)
@@ -322,7 +344,7 @@ def resolve_alert(alert_id):
         # Update port status to available
         result = db.stations.update_one(
             {'_id': ObjectId(station_id), 'ports.id': int(port_id)},
-            {'$set': {'ports.$.status': 'available', 'updated_at': datetime.utcnow()}}
+            {'$set': {'ports.$.status': 'available', 'updated_at': now_utc()}}
         )
         
         if result.modified_count == 0:

@@ -48,8 +48,8 @@ class Review:
         """Convert to API response format"""
         return {
             'id': self.id if hasattr(self, 'id') else None,
-            'stationId': self.station_id,
-            'userId': self.user_id,
+            'stationId': str(self.station_id) if self.station_id else None,
+            'userId': str(self.user_id) if self.user_id else None,
             'userName': self.user_name,
             'rating': self.rating,
             'comment': self.comment,

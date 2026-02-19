@@ -1,989 +1,689 @@
-// API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Helper function to get auth token
 const getAuthToken = () => localStorage.getItem('evpulse_token');
 
-// Helper function for API requests
 const apiRequest = async (endpoint, options = {}) => {
   const token = getAuthToken();
-  
-  const config = {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
     },
     ...options,
-  };
+  });
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'An error occurred');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || 'Request failed');
   }
+  return payload;
 };
 
-// Auth API
+const safeError = (error) => ({ success: false, error: error.message || 'Request failed' });
+
 export const authAPI = {
-  login: async (email, password) => {
+  async login(email, password) {
     try {
       const response = await apiRequest('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      
-      if (response.success && response.token) {
+      if (response?.token) {
         localStorage.setItem('evpulse_token', response.token);
       }
-      
       return response;
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  register: async (userData) => {
+  async register(userData) {
     try {
       const response = await apiRequest('/auth/register', {
         method: 'POST',
         body: JSON.stringify(userData),
       });
-      
-      if (response.success && response.token) {
+      if (response?.token) {
         localStorage.setItem('evpulse_token', response.token);
       }
-      
       return response;
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getCurrentUser: async () => {
+  async getCurrentUser() {
     try {
       return await apiRequest('/auth/profile');
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  updateProfile: async (data) => {
+  async updateProfile(data) {
     try {
       return await apiRequest('/auth/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  changePassword: async (currentPassword, newPassword) => {
+  async changePassword(currentPassword, newPassword) {
     try {
       return await apiRequest('/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  logout: () => {
+  logout() {
     localStorage.removeItem('evpulse_token');
     localStorage.removeItem('evpulse_user');
   },
 };
 
-// Stations API
 export const stationsAPI = {
-  getAll: async (filters = {}) => {
+  async getAll(filters = {}) {
     try {
       const params = new URLSearchParams();
-      if (filters.status) params.append('status', filters.status);
-      if (filters.chargingType) params.append('chargingType', filters.chargingType);
-      if (filters.maxDistance) params.append('maxDistance', filters.maxDistance);
-      if (filters.sortBy) params.append('sortBy', filters.sortBy);
-      if (filters.lat) params.append('lat', filters.lat);
-      if (filters.lng) params.append('lng', filters.lng);
-      if (filters.city) params.append('city', filters.city);
-      
-      const queryString = params.toString();
-      return await apiRequest(`/stations${queryString ? `?${queryString}` : ''}`);
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+      return await apiRequest(`/stations${params.toString() ? `?${params.toString()}` : ''}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getById: async (id) => {
+  async getById(id) {
     try {
-      const response = await apiRequest(`/stations/${id}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Fallback to mock data if API fails
-      const { chargingStations } = await import('./mockData');
-      const station = chargingStations.find(s => s.id === parseInt(id));
-      return { success: !!station, data: station || null };
+      return await apiRequest(`/stations/${id}`);
     } catch (error) {
-      // Fallback to mock data on error
-      try {
-        const { chargingStations } = await import('./mockData');
-        const station = chargingStations.find(s => s.id === parseInt(id));
-        return { success: !!station, data: station || null };
-      } catch (e) {
-        return { success: false, error: error.message };
-      }
+      return safeError(error);
     }
   },
 
-  getByOperator: async (operatorId) => {
+  async getByOperator(operatorId) {
     try {
-      const response = await apiRequest(`/stations/operator/${operatorId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Fallback to mock data
-      const { chargingStations } = await import('./mockData');
-      const stations = chargingStations.filter(s => s.operatorId === parseInt(operatorId) || operatorId);
-      return { success: true, data: stations };
+      return await apiRequest(`/stations/operator/${operatorId}`);
     } catch (error) {
-      // Fallback to mock data on error
-      try {
-        const { chargingStations } = await import('./mockData');
-        const stations = chargingStations.filter(s => s.operatorId === parseInt(operatorId) || operatorId);
-        return { success: true, data: stations };
-      } catch (e) {
-        return { success: false, error: error.message };
-      }
+      return safeError(error);
     }
   },
 
-  create: async (stationData) => {
+  async create(stationData) {
     try {
       return await apiRequest('/stations', {
         method: 'POST',
         body: JSON.stringify(stationData),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  update: async (stationId, stationData) => {
+  async update(stationId, stationData) {
     try {
       return await apiRequest(`/stations/${stationId}`, {
         method: 'PUT',
         body: JSON.stringify(stationData),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  updateStatus: async (stationId, status) => {
+  async updateStatus(stationId, status) {
     try {
       return await apiRequest(`/stations/${stationId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
 
-// Sessions API
 export const sessionsAPI = {
-  getByUser: async (userId) => {
+  async getByUser() {
     try {
-      return await apiRequest(`/sessions/user/${userId}`);
+      return await apiRequest('/sessions');
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getActive: async (userId) => {
+  async getActive(userId) {
     try {
       return await apiRequest(`/sessions/active/${userId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  startSession: async (sessionData) => {
+  async startSession(sessionData) {
     try {
       return await apiRequest('/sessions/start', {
         method: 'POST',
         body: JSON.stringify(sessionData),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  stopSession: async (sessionId) => {
+  async stopSession(sessionId) {
     try {
-      return await apiRequest(`/sessions/stop/${sessionId}`, {
-        method: 'POST',
-      });
+      return await apiRequest(`/sessions/stop/${sessionId}`, { method: 'POST' });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getByStation: async (stationId) => {
+  async getByStation(stationId) {
     try {
       return await apiRequest(`/sessions/station/${stationId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
 
-// Bookings API
 export const bookingsAPI = {
-  getByUser: async (userId) => {
+  async getByUser() {
     try {
-      const response = await apiRequest(`/bookings/user/${userId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Fallback to mock data
-      const { bookings } = await import('./mockData');
-      const userBookings = bookings.filter(booking => booking.userId === parseInt(userId));
-      return { success: true, data: userBookings };
+      return await apiRequest('/bookings');
     } catch (error) {
-      // Fallback to mock data on error
-      try {
-        const { bookings } = await import('./mockData');
-        const userBookings = bookings.filter(booking => booking.userId === parseInt(userId));
-        return { success: true, data: userBookings };
-      } catch (e) {
-        return { success: false, error: error.message, data: [] };
-      }
+      return safeError(error);
     }
   },
 
-  create: async (bookingData) => {
+  async create(bookingData) {
     try {
       return await apiRequest('/bookings', {
         method: 'POST',
         body: JSON.stringify(bookingData),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  cancel: async (bookingId) => {
+  async cancel(bookingId) {
     try {
-      return await apiRequest(`/bookings/${bookingId}/cancel`, {
-        method: 'POST',
-      });
+      return await apiRequest(`/bookings/${bookingId}/cancel`, { method: 'POST' });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getAvailableSlots: async (stationId, date, portId) => {
+  async getAvailableSlots(stationId, date, portId) {
     try {
       const params = new URLSearchParams({ stationId, date });
-      if (portId) params.append('portId', portId);
+      if (portId !== undefined && portId !== null) {
+        params.append('portId', portId);
+      }
       return await apiRequest(`/bookings/available-slots?${params.toString()}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getByStation: async (stationId) => {
+  async getByStation(stationId) {
     try {
       return await apiRequest(`/bookings/station/${stationId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
 
-// Transactions API
 export const transactionsAPI = {
-  getByUser: async (userId) => {
+  async getByUser() {
     try {
-      return await apiRequest(`/transactions/user/${userId}`);
+      return await apiRequest('/transactions');
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  processPayment: async (paymentData) => {
+  async processPayment(paymentData) {
     try {
       return await apiRequest('/transactions/process', {
         method: 'POST',
         body: JSON.stringify(paymentData),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getWalletBalance: async (userId) => {
+  async getWalletBalance(userId) {
     try {
       return await apiRequest(`/transactions/wallet/balance/${userId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  topUpWallet: async (amount, paymentMethod) => {
+  async topUpWallet(amount, paymentMethod) {
     try {
       return await apiRequest('/transactions/wallet/topup', {
         method: 'POST',
         body: JSON.stringify({ amount, paymentMethod }),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getSummary: async (userId) => {
+  async getSummary(userId) {
     try {
       return await apiRequest(`/transactions/summary/${userId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
 
-// Admin API
 export const adminAPI = {
-  getStats: async () => {
+  async getStats() {
     try {
-      const response = await apiRequest('/admin/stats');
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: {
-          totalUsers: 3456,
-          totalOperators: 48,
-          totalStations: 165,
-          totalEnergy: 76380,
-          totalRevenue: 115200,
-          activeChargers: 145,
-          todayRevenue: 8450,
-          todayEnergy: 5680,
-          newUsersThisMonth: 342,
-          pendingOperators: 5,
-        },
-      };
+      return await apiRequest('/admin/stats');
     } catch (error) {
-      return {
-        success: true,
-        data: {
-          totalUsers: 3456,
-          totalOperators: 48,
-          totalStations: 165,
-          totalEnergy: 76380,
-          totalRevenue: 115200,
-          activeChargers: 145,
-          todayRevenue: 8450,
-          todayEnergy: 5680,
-          newUsersThisMonth: 342,
-          pendingOperators: 5,
-        },
-      };
+      return safeError(error);
     }
   },
 
-  getAllUsers: async (role) => {
+  async getAllUsers(role) {
     try {
       const params = role ? `?role=${role}` : '';
-      const response = await apiRequest(`/admin/users${params}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: [
-          { id: 1, name: 'John Smith', email: 'john@example.com', role: 'user', status: 'active', createdAt: '2026-01-15', totalSessions: 45, totalSpent: 245.50 },
-          { id: 2, name: 'Sarah Johnson', email: 'sarah@example.com', role: 'user', status: 'active', createdAt: '2026-01-10', totalSessions: 32, totalSpent: 189.00 },
-          { id: 3, name: 'Mike Williams', email: 'mike@example.com', role: 'operator', status: 'active', createdAt: '2026-01-05', totalStations: 5, totalRevenue: 12500 },
-          { id: 4, name: 'Emily Brown', email: 'emily@example.com', role: 'user', status: 'suspended', createdAt: '2025-12-20', totalSessions: 8, totalSpent: 45.00 },
-          { id: 5, name: 'David Lee', email: 'david@example.com', role: 'operator', status: 'pending', createdAt: '2026-01-20', totalStations: 0, totalRevenue: 0 },
-        ],
-      };
+      return await apiRequest(`/admin/users${params}`);
     } catch (error) {
-      return {
-        success: true,
-        data: [],
-      };
+      return safeError(error);
     }
   },
 
-  getAllStations: async () => {
+  async getAllStations() {
     try {
-      const response = await apiRequest('/admin/stations');
-      if (response.success && response.data) {
-        return response;
-      }
-      // Fallback to mock data
-      const { chargingStations } = await import('./mockData');
-      return { success: true, data: chargingStations };
+      return await apiRequest('/admin/stations');
     } catch (error) {
-      try {
-        const { chargingStations } = await import('./mockData');
-        return { success: true, data: chargingStations };
-      } catch (e) {
-        return { success: true, data: [] };
-      }
+      return safeError(error);
     }
   },
 
-  updateUserStatus: async (userId, status) => {
+  async getAllBookings() {
+    try {
+      return await apiRequest('/admin/bookings');
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
+  async getAllSessions() {
+    try {
+      return await apiRequest('/admin/sessions');
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
+  async getAllTransactions() {
+    try {
+      return await apiRequest('/admin/transactions');
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
+  async updateUserStatus(userId, status) {
     try {
       return await apiRequest(`/admin/users/${userId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
       });
     } catch (error) {
-      // Return mock success
-      return { success: true };
+      return safeError(error);
     }
   },
 
-  updateStationStatus: async (stationId, status) => {
+  async updateStationStatus(stationId, status) {
     try {
       return await apiRequest(`/admin/stations/${stationId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
       });
     } catch (error) {
-      // Return mock success
-      return { success: true };
+      return safeError(error);
     }
   },
 };
 
-// Operator API
 export const operatorAPI = {
-  getStats: async (operatorId) => {
+  async getStats() {
     try {
       const response = await apiRequest('/operator/stats');
-      if (response.success && response.data) {
-        return response.data;
-      }
-      // Return mock data fallback
-      return {
-        totalStations: 5,
-        activeSessions: 12,
-        todayRevenue: 1245.50,
-        todayEnergy: 856.3,
-        portUtilization: 68,
-        totalPorts: 24,
-        revenueByStation: [
-          { station: 'Downtown Hub', revenue: 450 },
-          { station: 'Mall Parking', revenue: 320 },
-          { station: 'Tech Park', revenue: 280 },
-          { station: 'Highway Rest', revenue: 195.5 },
-        ],
-        sessionsByHour: [
-          { hour: '8AM', sessions: 5 },
-          { hour: '10AM', sessions: 8 },
-          { hour: '12PM', sessions: 12 },
-          { hour: '2PM', sessions: 10 },
-          { hour: '4PM', sessions: 15 },
-          { hour: '6PM', sessions: 18 },
-          { hour: '8PM', sessions: 8 },
-        ],
-        maintenanceAlerts: [
-          { id: 1, stationId: 3, portId: 2, message: 'Port offline - needs inspection', priority: 'high' },
-          { id: 2, stationId: 1, portId: 4, message: 'Scheduled maintenance due', priority: 'medium' },
-        ],
-      };
+      return response.data || {};
     } catch (error) {
-      // Return mock data on error (flat format matching success path)
-      return {
-        totalStations: 5,
-        activeSessions: 12,
-        todayRevenue: 1245.50,
-        todayEnergy: 856.3,
-        portUtilization: 68,
-        totalPorts: 24,
-        monthlyRevenue: 8450.00,
-        monthlyEnergy: 5680.5,
-        averageSessionDuration: 42,
-        revenueByStation: [
-          { station: 'Downtown Hub', revenue: 450 },
-          { station: 'Mall Parking', revenue: 320 },
-          { station: 'Tech Park', revenue: 280 },
-          { station: 'Highway Rest', revenue: 195.5 },
-        ],
-        sessionsByHour: [
-          { hour: '8AM', sessions: 5 },
-          { hour: '10AM', sessions: 8 },
-          { hour: '12PM', sessions: 12 },
-          { hour: '2PM', sessions: 10 },
-          { hour: '4PM', sessions: 15 },
-          { hour: '6PM', sessions: 18 },
-          { hour: '8PM', sessions: 8 },
-        ],
-        maintenanceAlerts: [],
-      };
+      return {};
     }
   },
 
-  getStations: async () => {
+  async getStations() {
     try {
-      const response = await apiRequest('/operator/stations');
-      if (response.success && response.data) {
-        return response;
-      }
-      // Fallback to mock data
-      const { chargingStations } = await import('./mockData');
-      return { success: true, data: chargingStations.slice(0, 3) };
+      return await apiRequest('/operator/stations');
     } catch (error) {
-      // Fallback to mock data on error
-      try {
-        const { chargingStations } = await import('./mockData');
-        return { success: true, data: chargingStations.slice(0, 3) };
-      } catch (e) {
-        return { success: false, error: error.message };
-      }
+      return safeError(error);
     }
   },
 
-  updatePricing: async (stationId, pricing) => {
+  async updatePricing(stationId, pricing) {
     try {
       return await apiRequest(`/operator/pricing/${stationId}`, {
         method: 'PUT',
         body: JSON.stringify(pricing),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  updatePortStatus: async (stationId, portId, status) => {
+  async updatePortStatus(stationId, portId, status) {
     try {
       return await apiRequest(`/operator/port-status/${stationId}/${portId}`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getMaintenanceAlerts: async (operatorId) => {
+  async getMaintenanceAlerts() {
     try {
-      const response = await apiRequest('/operator/maintenance-alerts');
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: [
-          {
-            id: 1,
-            stationId: 3,
-            portId: 2,
-            type: 'offline',
-            message: 'Port offline - needs inspection',
-            priority: 'high',
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-          },
-          {
-            id: 2,
-            stationId: 1,
-            portId: 4,
-            type: 'maintenance',
-            message: 'Scheduled maintenance due',
-            priority: 'medium',
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-          },
-        ],
-      };
+      return await apiRequest('/operator/maintenance-alerts');
     } catch (error) {
-      return {
-        success: true,
-        data: [
-          {
-            id: 1,
-            stationId: 3,
-            portId: 2,
-            type: 'offline',
-            message: 'Port offline - needs inspection',
-            priority: 'high',
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-          },
-        ],
-      };
+      return safeError(error);
     }
   },
 
-  resolveAlert: async (alertId) => {
+  async resolveAlert(alertId) {
     try {
-      return await apiRequest(`/operator/resolve-alert/${alertId}`, {
-        method: 'POST',
-      });
+      return await apiRequest(`/operator/resolve-alert/${alertId}`, { method: 'POST' });
     } catch (error) {
-      // Return success for mock purposes
-      return { success: true };
+      return safeError(error);
     }
   },
 
-  getFeedback: async (operatorId) => {
+  async getFeedback() {
     try {
       const response = await apiRequest('/operator/feedback');
-      if (response.success && response.data) {
-        return response.data;
-      }
-      // Return mock data fallback with correct structure
+      const stations = response.data || [];
+      const totalReviews = stations.reduce((sum, s) => sum + (s.totalReviews || 0), 0);
+      const weightedRating = stations.reduce((sum, s) => sum + ((s.averageRating || 0) * (s.totalReviews || 0)), 0);
+      const averageRating = totalReviews ? Number((weightedRating / totalReviews).toFixed(1)) : 0;
+      const positiveReviews = totalReviews
+        ? Math.round((stations.reduce((sum, s) => sum + ((s.ratingBreakdown?.[5] || 0) + (s.ratingBreakdown?.[4] || 0)), 0) / totalReviews) * 100)
+        : 0;
+
+      const reviews = stations.flatMap((station) =>
+        (station.recentReviews || []).map((review, index) => ({
+          id: `${station.stationId}-${index}`,
+          stationId: station.stationId,
+          stationName: station.stationName,
+          userName: review.userName || 'User',
+          rating: review.rating || 0,
+          comment: review.comment || '',
+          createdAt: review.date || null,
+          status: 'pending',
+        }))
+      );
+
+      const ratingDistribution = {
+        5: stations.reduce((sum, s) => sum + (s.ratingBreakdown?.[5] || 0), 0),
+        4: stations.reduce((sum, s) => sum + (s.ratingBreakdown?.[4] || 0), 0),
+        3: stations.reduce((sum, s) => sum + (s.ratingBreakdown?.[3] || 0), 0),
+        2: stations.reduce((sum, s) => sum + (s.ratingBreakdown?.[2] || 0), 0),
+        1: stations.reduce((sum, s) => sum + (s.ratingBreakdown?.[1] || 0), 0),
+      };
+
       return {
         stats: {
-          averageRating: 4.3,
-          totalReviews: 48,
-          thisMonthReviews: 12,
-          positiveReviews: 85,
-          resolvedIssues: 15,
-          pendingIssues: 3,
+          averageRating,
+          totalReviews,
+          thisMonthReviews: reviews.length,
+          positiveReviews,
+          resolvedIssues: 0,
+          pendingIssues: reviews.length,
+          ratingDistribution,
         },
-        reviews: [
-          {
-            id: 1,
-            stationId: 1,
-            stationName: 'Downtown EV Hub',
-            userId: 1,
-            userName: 'John Doe',
-            rating: 5,
-            comment: 'Excellent charging experience! Fast and reliable.',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            status: 'resolved',
-          },
-          {
-            id: 2,
-            stationId: 2,
-            stationName: 'Mall Parking Station',
-            userId: 2,
-            userName: 'Jane Smith',
-            rating: 4,
-            comment: 'Good location, but could use more ports during peak hours.',
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-            status: 'acknowledged',
-          },
-          {
-            id: 3,
-            stationId: 1,
-            stationName: 'Downtown EV Hub',
-            userId: 3,
-            userName: 'Mike Williams',
-            rating: 2,
-            comment: 'Station was offline when I arrived. Disappointed.',
-            createdAt: new Date(Date.now() - 259200000).toISOString(),
-            status: 'pending',
-          },
-        ],
-        ratingDistribution: [
-          { rating: 5, count: 20 },
-          { rating: 4, count: 15 },
-          { rating: 3, count: 8 },
-          { rating: 2, count: 3 },
-          { rating: 1, count: 2 },
-        ],
+        reviews,
+        ratingDistribution,
       };
     } catch (error) {
       return {
-        stats: {
-          averageRating: 0,
-          totalReviews: 0,
-          thisMonthReviews: 0,
-          positiveReviews: 0,
-          resolvedIssues: 0,
-          pendingIssues: 0,
-        },
+        stats: { averageRating: 0, totalReviews: 0, thisMonthReviews: 0, positiveReviews: 0, resolvedIssues: 0, pendingIssues: 0, ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } },
         reviews: [],
-        ratingDistribution: [],
+        ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
       };
     }
   },
 };
 
-// Reviews API
 export const reviewsAPI = {
-  getByStation: async (stationId) => {
+  async getByStation(stationId) {
     try {
-      const response = await apiRequest(`/reviews/station/${stationId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: [
-          { id: 1, userId: 1, userName: 'John Smith', rating: 5, comment: 'Great charging experience!', createdAt: new Date(Date.now() - 86400000).toISOString(), helpful: 12 },
-          { id: 2, userId: 2, userName: 'Sarah Johnson', rating: 4, comment: 'Fast charging, good location.', createdAt: new Date(Date.now() - 172800000).toISOString(), helpful: 8 },
-          { id: 3, userId: 3, userName: 'Mike Williams', rating: 5, comment: 'Best station in the area!', createdAt: new Date(Date.now() - 259200000).toISOString(), helpful: 5 },
-        ],
-      };
+      return await apiRequest(`/reviews/station/${stationId}`);
     } catch (error) {
-      return {
-        success: true,
-        data: [],
-      };
+      return safeError(error);
     }
   },
 
-  create: async (reviewData) => {
+  async create(reviewData) {
     try {
       return await apiRequest('/reviews', {
         method: 'POST',
         body: JSON.stringify(reviewData),
       });
     } catch (error) {
-      // Return mock success
-      return { success: true, data: { id: Date.now(), ...reviewData } };
+      return safeError(error);
     }
   },
 
-  getByUser: async (userId) => {
+  async getByUser(userId) {
     try {
       return await apiRequest(`/reviews/user/${userId}`);
     } catch (error) {
-      return { success: true, data: [] };
+      return safeError(error);
     }
   },
 
-  markHelpful: async (reviewId) => {
+  async markHelpful(reviewId) {
     try {
-      return await apiRequest(`/reviews/${reviewId}/helpful`, {
-        method: 'POST',
-      });
+      return await apiRequest(`/reviews/${reviewId}/helpful`, { method: 'POST' });
     } catch (error) {
-      return { success: true };
+      return safeError(error);
     }
   },
 };
 
-// Charging History API
 export const historyAPI = {
-  getByUser: async (userId) => {
+  async getByUser(userId) {
     try {
-      const response = await apiRequest(`/sessions/history/${userId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      const { chargingSessions } = await import('./mockData');
-      return { success: true, data: chargingSessions };
+      return await apiRequest(`/sessions/history/${userId}`);
     } catch (error) {
-      try {
-        const { chargingSessions } = await import('./mockData');
-        return { success: true, data: chargingSessions };
-      } catch (e) {
-        return { success: true, data: [] };
-      }
+      return safeError(error);
     }
   },
 
-  getStats: async (userId) => {
+  async getStats(userId) {
     try {
-      const response = await apiRequest(`/sessions/stats/${userId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: {
-          totalSessions: 45,
-          totalEnergy: 856.3,
-          totalCost: 245.50,
-          totalTime: 1845,
-          favoriteStation: 'Downtown EV Hub',
-          averageChargingTime: 41,
-          carbonSaved: 128.5,
-        },
-      };
+      return await apiRequest(`/sessions/stats/${userId}`);
     } catch (error) {
-      return {
-        success: true,
-        data: {
-          totalSessions: 45,
-          totalEnergy: 856.3,
-          totalCost: 245.50,
-          totalTime: 1845,
-          favoriteStation: 'Downtown EV Hub',
-          averageChargingTime: 41,
-          carbonSaved: 128.5,
-        },
-      };
+      return safeError(error);
     }
   },
 };
 
-// User Notifications API
 export const notificationsAPI = {
-  getByUser: async (userId) => {
+  async getByUser(userId) {
     try {
-      const response = await apiRequest(`/notifications/user/${userId}`);
-      if (response.success && response.data) {
-        return response;
-      }
-      // Return mock data fallback
-      return {
-        success: true,
-        data: [
-          { id: 1, type: 'charging_complete', title: 'Charging Complete', message: 'Your charging session has completed.', read: false, createdAt: new Date().toISOString() },
-          { id: 2, type: 'payment', title: 'Payment Received', message: 'Your payment of $24.50 was successful.', read: true, createdAt: new Date(Date.now() - 3600000).toISOString() },
-        ],
-      };
+      return await apiRequest(`/notifications/user/${userId}`);
     } catch (error) {
-      return { success: true, data: [] };
+      return safeError(error);
     }
   },
 
-  markAsRead: async (notificationId) => {
+  async markAsRead(notificationId) {
     try {
-      return await apiRequest(`/notifications/${notificationId}/read`, {
-        method: 'PUT',
-      });
+      return await apiRequest(`/notifications/${notificationId}/read`, { method: 'PUT' });
     } catch (error) {
-      return { success: true };
+      return safeError(error);
     }
   },
 
-  markAllAsRead: async (userId) => {
+  async markAllAsRead(userId) {
     try {
-      return await apiRequest(`/notifications/user/${userId}/read-all`, {
-        method: 'PUT',
-      });
+      return await apiRequest(`/notifications/user/${userId}/read-all`, { method: 'PUT' });
     } catch (error) {
-      return { success: true };
+      return safeError(error);
     }
   },
 
-  getUnreadCount: async (userId) => {
+  async getUnreadCount(userId) {
     try {
-      const response = await apiRequest(`/notifications/user/${userId}/unread-count`);
-      if (response.success) {
-        return response;
-      }
-      return { success: true, data: { count: 0 } };
+      return await apiRequest(`/notifications/user/${userId}/unread-count`);
     } catch (error) {
-      return { success: true, data: { count: 0 } };
+      return safeError(error);
     }
   },
 };
 
-// Admin Feedback API
 export const adminFeedbackAPI = {
-  getAll: async () => {
-    // Return mock data for admin feedback dashboard
-    return {
-      stats: {
-        platformRating: 4.5,
-        totalReviews: 2456,
-        thisWeekReviews: 87,
-        pendingReviews: 12,
-        flaggedReviews: 3,
-        satisfactionRate: 89,
-      },
-      topStations: [
-        { id: 1, name: 'Downtown Hub', operatorName: 'GreenCharge Inc', rating: 4.9, reviewCount: 256 },
-        { id: 2, name: 'Airport Terminal', operatorName: 'FastCharge Co', rating: 4.8, reviewCount: 412 },
-        { id: 3, name: 'Mall Parking A', operatorName: 'EV Charge Inc', rating: 4.7, reviewCount: 198 },
-        { id: 4, name: 'Tech Park', operatorName: 'GreenCharge Inc', rating: 4.6, reviewCount: 156 },
-        { id: 5, name: 'City Hospital', operatorName: 'MedCharge', rating: 4.5, reviewCount: 89 },
-      ],
-      lowRatedStations: [
-        { id: 6, name: 'Highway Rest Stop', operatorName: 'FastCharge Co', rating: 2.8, reviewCount: 45 },
-        { id: 7, name: 'University Campus', operatorName: 'EV Charge Inc', rating: 3.1, reviewCount: 67 },
-        { id: 8, name: 'City Center', operatorName: 'QuickCharge', rating: 3.3, reviewCount: 34 },
-      ],
-      commonIssues: [
-        { issue: 'Slow Charging', count: 156, severity: 'medium', trend: 'down' },
-        { issue: 'Station Offline', count: 89, severity: 'high', trend: 'up' },
-        { issue: 'Payment Issues', count: 67, severity: 'medium', trend: 'down' },
-        { issue: 'Dirty Facilities', count: 45, severity: 'low', trend: 'down' },
-      ],
-      reviews: [
-        { id: 1, userName: 'John Smith', stationName: 'Downtown Hub', operatorName: 'GreenCharge Inc', rating: 5, comment: 'Excellent charging station! Fast and reliable.', status: 'approved', createdAt: '2026-01-25' },
-        { id: 2, userName: 'Sarah Johnson', stationName: 'Mall Parking A', operatorName: 'EV Charge Inc', rating: 4, comment: 'Good experience overall. Could use more ports.', status: 'approved', createdAt: '2026-01-24' },
-        { id: 3, userName: 'Mike Williams', stationName: 'Highway Rest Stop', operatorName: 'FastCharge Co', rating: 2, comment: 'Station was often offline. Very frustrating.', status: 'flagged', createdAt: '2026-01-23' },
-        { id: 4, userName: 'Emily Brown', stationName: 'Airport Terminal', operatorName: 'FastCharge Co', rating: 5, comment: 'Perfect location and super fast charging!', status: 'approved', createdAt: '2026-01-22' },
-        { id: 5, userName: 'David Lee', stationName: 'Tech Park', operatorName: 'GreenCharge Inc', rating: 3, comment: 'Average experience. Pricing could be better.', status: 'pending', createdAt: '2026-01-21' },
-      ],
-    };
+  async getAll() {
+    try {
+      const [statsRes, reviewsRes, stationsRes] = await Promise.all([
+        apiRequest('/admin/feedback/stats'),
+        apiRequest('/admin/feedback/reviews'),
+        apiRequest('/admin/stations'),
+      ]);
+
+      const stats = statsRes.data || {};
+      const reviews = reviewsRes.data || [];
+      const stations = stationsRes.data || [];
+
+      const topStations = [...stations]
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 5)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          operatorName: s.operatorId,
+          rating: s.rating || 0,
+          reviewCount: s.totalReviews || 0,
+        }));
+
+      const lowRatedStations = [...stations]
+        .filter((s) => (s.rating || 0) > 0)
+        .sort((a, b) => (a.rating || 0) - (b.rating || 0))
+        .slice(0, 5)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          operatorName: s.operatorId,
+          rating: s.rating || 0,
+          reviewCount: s.totalReviews || 0,
+        }));
+
+      const normalizedReviews = reviews.map((review) => ({
+        ...review,
+        stationName: review.stationName || review.stationId,
+        operatorName: review.operatorName || 'Operator',
+        status: review.status || 'pending',
+        createdAt: review.timestamp,
+      }));
+
+      return {
+        stats: {
+          platformRating: stats.averageRating || 0,
+          totalReviews: stats.totalReviews || 0,
+          thisWeekReviews: stats.reviewsThisMonth || 0,
+          pendingReviews: normalizedReviews.filter((r) => (r.status || '') === 'pending').length,
+          flaggedReviews: normalizedReviews.filter((r) => (r.rating || 0) <= 2).length,
+          satisfactionRate: stats.averageRating ? Math.min(100, Math.round((stats.averageRating / 5) * 100)) : 0,
+        },
+        topStations,
+        lowRatedStations,
+        reviews: normalizedReviews,
+      };
+    } catch (error) {
+      return {
+        stats: { platformRating: 0, totalReviews: 0, thisWeekReviews: 0, pendingReviews: 0, flaggedReviews: 0, satisfactionRate: 0 },
+        topStations: [],
+        lowRatedStations: [],
+        reviews: [],
+      };
+    }
   },
 
-  getStats: async () => {
+  async getStats() {
     try {
       return await apiRequest('/admin/feedback/stats');
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  getAllReviews: async (filters = {}) => {
+  async getAllReviews(filters = {}) {
     try {
       const params = new URLSearchParams();
       if (filters.rating) params.append('rating', filters.rating);
       if (filters.stationId) params.append('stationId', filters.stationId);
-      
-      const queryString = params.toString();
-      return await apiRequest(`/admin/feedback/reviews${queryString ? `?${queryString}` : ''}`);
+      return await apiRequest(`/admin/feedback/reviews${params.toString() ? `?${params.toString()}` : ''}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
 
-// Users API
 export const usersAPI = {
-  getById: async (userId) => {
+  async getById(userId) {
     try {
       return await apiRequest(`/users/${userId}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  update: async (userId, data) => {
+  async update(userId, data) {
     try {
       return await apiRequest(`/users/${userId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       });
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 
-  search: async (query, role) => {
+  async search(query, role) {
     try {
       const params = new URLSearchParams();
       if (query) params.append('q', query);
       if (role) params.append('role', role);
-      return await apiRequest(`/users/search?${params.toString()}`);
+      return await apiRequest(`/users/search${params.toString() ? `?${params.toString()}` : ''}`);
     } catch (error) {
-      return { success: false, error: error.message };
+      return safeError(error);
     }
   },
 };
-

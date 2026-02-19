@@ -40,58 +40,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
 
-  // Mock data for charts
-  const revenueData = [
-    { date: 'Mon', revenue: 12450, users: 145 },
-    { date: 'Tue', revenue: 15680, users: 178 },
-    { date: 'Wed', revenue: 14320, users: 162 },
-    { date: 'Thu', revenue: 18950, users: 198 },
-    { date: 'Fri', revenue: 21240, users: 225 },
-    { date: 'Sat', revenue: 17890, users: 189 },
-    { date: 'Sun', revenue: 14670, users: 156 },
-  ];
-
-  const energyData = [
-    { date: 'Mon', energy: 8560 },
-    { date: 'Tue', energy: 10250 },
-    { date: 'Wed', energy: 9380 },
-    { date: 'Thu', energy: 12450 },
-    { date: 'Fri', energy: 14200 },
-    { date: 'Sat', energy: 11890 },
-    { date: 'Sun', energy: 9650 },
-  ];
-
-  const userGrowthData = [
-    { month: 'Aug', users: 1250 },
-    { month: 'Sep', users: 1580 },
-    { month: 'Oct', users: 1920 },
-    { month: 'Nov', users: 2340 },
-    { month: 'Dec', users: 2890 },
-    { month: 'Jan', users: 3456 },
-  ];
-
-  const stationStatusData = [
-    { name: 'Online', value: 145, color: '#22c55e' },
-    { name: 'Offline', value: 8, color: '#ef4444' },
-    { name: 'Maintenance', value: 12, color: '#f59e0b' },
-  ];
-
-  const topRegions = [
-    { name: 'California', stations: 45, revenue: 45600, growth: 12.5 },
-    { name: 'Texas', stations: 32, revenue: 32400, growth: 8.3 },
-    { name: 'New York', stations: 28, revenue: 29800, growth: 15.2 },
-    { name: 'Florida', stations: 24, revenue: 24500, growth: 6.8 },
-    { name: 'Washington', stations: 18, revenue: 19200, growth: 22.1 },
-  ];
-
-  const recentActivity = [
-    { type: 'user', message: 'New user registered: John Smith', time: '5 min ago' },
-    { type: 'station', message: 'Station #45 went offline', time: '12 min ago' },
-    { type: 'payment', message: `Large transaction: ${formatCurrency(245)}`, time: '25 min ago' },
-    { type: 'operator', message: 'New operator approved: GreenCharge Inc', time: '1 hour ago' },
-    { type: 'alert', message: 'Maintenance scheduled for Station #12', time: '2 hours ago' },
-  ];
-
   useEffect(() => {
     fetchStats();
   }, []);
@@ -142,6 +90,46 @@ const Dashboard = () => {
       color: 'warning',
     },
   ] : [];
+
+  const revenueData = (stats?.revenueByMonth || []).map((item) => ({
+    date: item.month,
+    revenue: item.revenue,
+    users: 0,
+  }));
+
+  const energyData = (stats?.revenueByMonth || []).map((item) => ({
+    date: item.month,
+    energy: 0,
+  }));
+
+  const userGrowthData = (stats?.revenueByMonth || []).map((item) => ({
+    month: item.month,
+    users: 0,
+  }));
+
+  const stationStatusData = [
+    { name: 'Online', value: stats?.activeChargers || 0, color: '#22c55e' },
+    { name: 'Offline', value: Math.max((stats?.totalStations || 0) - (stats?.activeChargers || 0), 0), color: '#ef4444' },
+  ];
+
+  const topRegions = (stats?.stationsByCity || []).map((item) => ({
+    name: item.city,
+    stations: item.count,
+    revenue: 0,
+    growth: 0,
+  }));
+
+  const recentActivity = (stats?.recentActivity || []).map((activity) => ({
+    type: activity.action?.toLowerCase().includes('user')
+      ? 'user'
+      : activity.action?.toLowerCase().includes('station')
+      ? 'station'
+      : activity.action?.toLowerCase().includes('payment')
+      ? 'payment'
+      : 'alert',
+    message: `${activity.action}: ${activity.user}`,
+    time: activity.timestamp || '-',
+  }));
 
   if (loading) {
     return (

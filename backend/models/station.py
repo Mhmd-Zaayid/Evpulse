@@ -78,7 +78,7 @@ class Station:
             'address': self.address,
             'city': self.city,
             'coordinates': self.coordinates,
-            'operatorId': self.operator_id,
+            'operatorId': str(self.operator_id) if self.operator_id else None,
             'status': self.status,
             'rating': self.rating,
             'totalReviews': self.total_reviews,

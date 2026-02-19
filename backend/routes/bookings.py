@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, g
 from database import get_db
 from models.booking import Booking
 from models.notification import Notification
 from bson import ObjectId
 from datetime import datetime
+
+from routes.common import role_required, to_object_id, now_utc
 
 bookings_bp = Blueprint('bookings', __name__)
 
@@ -16,53 +17,68 @@ AVAILABLE_TIME_SLOTS = [
     '20:00 - 21:00'
 ]
 
-@bookings_bp.route('/user/<user_id>', methods=['GET'])
-@jwt_required()
-def get_user_bookings(user_id):
-    """Get all bookings for a user"""
+def _serialize_bookings(bookings_data, db):
+    bookings = []
+    for data in bookings_data:
+        booking = Booking.from_dict(data)
+        station = db.stations.find_one({'_id': to_object_id(booking.station_id)})
+        booking_dict = booking.to_response_dict()
+        booking_dict['stationName'] = station['name'] if station else 'Unknown Station'
+        bookings.append(booking_dict)
+    return bookings
+
+
+@bookings_bp.route('', methods=['GET'])
+@role_required('user', 'operator', 'admin')
+def get_bookings():
+    """Get bookings filtered by role"""
     try:
-        # Check if database is available
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        bookings_data = list(db.bookings.find({'user_id': user_id}).sort('date', -1))
-        
-        bookings = []
-        for data in bookings_data:
-            booking = Booking.from_dict(data)
-            station = db.stations.find_one({'_id': ObjectId(booking.station_id)})
-            
-            booking_dict = booking.to_response_dict()
-            booking_dict['stationName'] = station['name'] if station else 'Unknown Station'
-            bookings.append(booking_dict)
-        
+        db = g.db
+        user = g.current_user
+        role = user.get('role')
+
+        query = {}
+        if role == 'user':
+            query['user_id'] = user['_id']
+        elif role == 'operator':
+            station_ids = [s['_id'] for s in db.stations.find({'operator_id': user['_id']}, {'_id': 1})]
+            query['station_id'] = {'$in': station_ids}
+
+        bookings_data = list(db.bookings.find(query).sort('created_at', -1))
+        bookings = _serialize_bookings(bookings_data, db)
         return jsonify({'success': True, 'data': bookings})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@bookings_bp.route('/user/<user_id>', methods=['GET'])
+@role_required('user', 'operator', 'admin')
+def get_user_bookings(user_id):
+    """Backward-compatible endpoint delegating to role-scoped bookings"""
+    return get_bookings()
+
 @bookings_bp.route('', methods=['POST'])
-@jwt_required()
+@role_required('user')
 def create_booking():
     """Create a new booking"""
     try:
-        # Check if database is available
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        user_id = get_jwt_identity()
-        data = request.get_json()
+        db = g.db
+        user_id = g.current_user_id
+        data = request.get_json() or {}
         
         # Validate required fields
         required_fields = ['stationId', 'portId', 'date', 'timeSlot']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
+
+        station_id = to_object_id(data.get('stationId'))
+        if not station_id:
+            return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
         
         # Check if slot is available
         existing = db.bookings.find_one({
-            'station_id': data['stationId'],
+            'station_id': station_id,
             'port_id': data['portId'],
             'date': data['date'],
             'time_slot': data['timeSlot'],
@@ -73,7 +89,9 @@ def create_booking():
             return jsonify({'success': False, 'error': 'Time slot is already booked'}), 400
         
         # Get station for pricing estimate
-        station = db.stations.find_one({'_id': ObjectId(data['stationId'])})
+        station = db.stations.find_one({'_id': station_id})
+        if not station:
+            return jsonify({'success': False, 'error': 'Station not found'}), 404
         charging_type = data.get('chargingType', 'Normal AC')
         
         # Estimate cost based on slot duration (1 hour)
@@ -82,20 +100,22 @@ def create_booking():
         
         booking = Booking(
             user_id=user_id,
-            station_id=data['stationId'],
+            station_id=station_id,
             port_id=data['portId'],
             date=data['date'],
             time_slot=data['timeSlot'],
             charging_type=charging_type,
             estimated_cost=estimated_cost
         )
+        booking.created_at = now_utc()
+        booking.updated_at = now_utc()
         
         result = db.bookings.insert_one(booking.to_dict())
         booking.id = str(result.inserted_id)
         
         # Create notification
         notification = Notification(
-            user_id=user_id,
+            user_id=str(user_id),
             notification_type='booking_confirmed',
             title='Booking Confirmed',
             message=f'Your booking at {station["name"]} for {data["date"]}, {data["timeSlot"]} has been confirmed.',
@@ -106,36 +126,40 @@ def create_booking():
         booking_dict = booking.to_response_dict()
         booking_dict['stationName'] = station['name'] if station else 'Unknown Station'
         
-        return jsonify({'success': True, 'data': booking_dict}), 201
+        return jsonify({
+            'success': True,
+            'message': 'Booking created successfully',
+            'data': booking_dict
+        }), 201
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @bookings_bp.route('/<booking_id>/cancel', methods=['POST'])
-@jwt_required()
+@role_required('user', 'admin')
 def cancel_booking(booking_id):
     """Cancel a booking"""
     try:
-        # Check if database is available
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        user_id = get_jwt_identity()
-        
-        booking_data = db.bookings.find_one({'_id': ObjectId(booking_id)})
+        db = g.db
+        user = g.current_user
+
+        booking_oid = to_object_id(booking_id)
+        if not booking_oid:
+            return jsonify({'success': False, 'error': 'Invalid booking id'}), 400
+
+        booking_data = db.bookings.find_one({'_id': booking_oid})
         
         if not booking_data:
             return jsonify({'success': False, 'error': 'Booking not found'}), 404
         
-        if booking_data['user_id'] != user_id:
+        if user.get('role') != 'admin' and booking_data.get('user_id') != user.get('_id'):
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
         if booking_data['status'] == 'cancelled':
             return jsonify({'success': False, 'error': 'Booking is already cancelled'}), 400
         
         db.bookings.update_one(
-            {'_id': ObjectId(booking_id)},
-            {'$set': {'status': 'cancelled', 'updated_at': datetime.utcnow()}}
+            {'_id': booking_oid},
+            {'$set': {'status': 'cancelled', 'updated_at': now_utc()}}
         )
         
         return jsonify({'success': True, 'message': 'Booking cancelled successfully'})
@@ -157,10 +181,14 @@ def get_available_slots():
         
         if not station_id or not date:
             return jsonify({'success': False, 'error': 'stationId and date are required'}), 400
+
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
         
         # Find booked slots
         query = {
-            'station_id': station_id,
+            'station_id': station_oid,
             'date': date,
             'status': {'$in': ['confirmed', 'pending']}
         }
@@ -178,17 +206,23 @@ def get_available_slots():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @bookings_bp.route('/station/<station_id>', methods=['GET'])
-@jwt_required()
+@role_required('operator', 'admin')
 def get_station_bookings(station_id):
     """Get all bookings for a station (operator view)"""
     try:
-        # Check if database is available
-        db = get_db()
-        if db is None:
-            return jsonify({'success': False, 'error': 'Database connection unavailable. Please try again later.'}), 503
-        
-        bookings_data = list(db.bookings.find({'station_id': station_id}).sort('date', -1))
-        bookings = [Booking.from_dict(data).to_response_dict() for data in bookings_data]
+        db = g.db
+        user = g.current_user
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        if user.get('role') == 'operator':
+            station = db.stations.find_one({'_id': station_oid})
+            if not station or station.get('operator_id') != user.get('_id'):
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        bookings_data = list(db.bookings.find({'station_id': station_oid}).sort('created_at', -1))
+        bookings = _serialize_bookings(bookings_data, db)
         
         return jsonify({'success': True, 'data': bookings})
     except Exception as e:

@@ -91,7 +91,6 @@ def _initialize_database(app: Flask) -> bool:
             collections = db.list_collection_names()
             logger.info(f"Database: {config.database_name}")
             logger.info(f"Collections: {collections}")
-            _initialize_sample_data(manager)
             app.config['DB_MANAGER'] = manager
             logger.info("Database connection established successfully")
             return True
@@ -103,99 +102,6 @@ def _initialize_database(app: Flask) -> bool:
         logger.error(f"Database initialization failed: {e}")
         logger.warning("App will start without DB — get_db() will auto-retry on requests")
         return False
-
-
-def _initialize_sample_data(manager) -> None:
-    """
-    Initialize database with sample data if collections are empty.
-    
-    Args:
-        manager: Database connection manager
-    """
-    try:
-        db = manager.db
-        
-        # Check if users exist
-        user_count = db.users.count_documents({})
-        
-        if user_count == 0:
-            logger.info("🌱 Database is empty, seeding with sample data...")
-            
-            # Try to run the seeder script
-            try:
-                import sys
-                import os
-                sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
-                from seed_db import seed_database
-                seed_database()
-                logger.info("✅ Sample data seeded successfully!")
-            except ImportError:
-                logger.warning("⚠️ Seeder script not found, creating basic users...")
-                _create_basic_users(db)
-            except Exception as e:
-                logger.warning(f"⚠️ Seeder failed: {e}, creating basic users...")
-                _create_basic_users(db)
-        else:
-            logger.info(f"✅ Database already contains {user_count} user(s)")
-            
-    except Exception as e:
-        logger.warning(f"⚠️ Sample data initialization failed: {e}")
-
-
-def _create_basic_users(db) -> None:
-    """
-    Create basic test users.
-    
-    Args:
-        db: Database instance
-    """
-    import bcrypt
-    from bson import ObjectId
-    
-    users = [
-        {
-            '_id': ObjectId(),
-            'email': 'admin@evpulse.com',
-            'password': bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            'name': 'Admin User',
-            'role': 'admin',
-            'phone': '+1234567890',
-            'is_active': True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        },
-        {
-            '_id': ObjectId(),
-            'email': 'operator@evpulse.com',
-            'password': bcrypt.hashpw('operator123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            'name': 'Station Operator',
-            'role': 'operator',
-            'phone': '+1234567891',
-            'company': 'EV Solutions Inc',
-            'is_active': True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        },
-        {
-            '_id': ObjectId(),
-            'email': 'user@evpulse.com',
-            'password': bcrypt.hashpw('user123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            'name': 'Test User',
-            'role': 'user',
-            'phone': '+1234567892',
-            'vehicle': {'make': 'Tesla', 'model': 'Model 3', 'batteryCapacity': 75},
-            'is_active': True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        }
-    ]
-    
-    db.users.insert_many(users)
-    
-    logger.info("✅ Created test users:")
-    logger.info("   📧 admin@evpulse.com / admin123")
-    logger.info("   📧 operator@evpulse.com / operator123")
-    logger.info("   📧 user@evpulse.com / user123")
 
 
 def _register_blueprints(app: Flask) -> None:

@@ -4,6 +4,10 @@ from database import get_db
 from models.user import User
 from bson import ObjectId
 from datetime import datetime, timedelta
+from models.booking import Booking
+from models.session import Session
+from models.transaction import Transaction
+from routes.common import to_object_id
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -85,14 +89,42 @@ def get_admin_stats():
         ]))
         stations_by_city = [{'city': s['_id'], 'count': s['count']} for s in stations_by_city]
         
-        # Recent activity
-        recent_activity = [
-            {'id': 1, 'action': 'New station registered', 'user': 'GreenTech Inc.', 'timestamp': '2 mins ago'},
-            {'id': 2, 'action': 'User complaint resolved', 'user': 'Support Team', 'timestamp': '15 mins ago'},
-            {'id': 3, 'action': 'Payment processed', 'user': 'System', 'timestamp': '32 mins ago'},
-            {'id': 4, 'action': 'Maintenance scheduled', 'user': 'PowerGrid Station', 'timestamp': '1 hour ago'},
-            {'id': 5, 'action': 'New operator approved', 'user': 'Admin', 'timestamp': '2 hours ago'},
-        ]
+        # Recent activity from DB
+        recent_activity = []
+
+        latest_users = list(db.users.find({}).sort('created_at', -1).limit(3))
+        latest_stations = list(db.stations.find({}).sort('created_at', -1).limit(3))
+        latest_transactions = list(db.transactions.find({}).sort('timestamp', -1).limit(3))
+
+        for user in latest_users:
+            recent_activity.append({
+                'id': f"user-{user['_id']}",
+                'action': 'New user registered',
+                'user': user.get('name', user.get('email', 'Unknown')),
+                'timestamp': user.get('created_at').isoformat() if user.get('created_at') else None
+            })
+
+        for station in latest_stations:
+            recent_activity.append({
+                'id': f"station-{station['_id']}",
+                'action': 'New station registered',
+                'user': station.get('name', 'Unknown Station'),
+                'timestamp': station.get('created_at').isoformat() if station.get('created_at') else None
+            })
+
+        for transaction in latest_transactions:
+            recent_activity.append({
+                'id': f"transaction-{transaction['_id']}",
+                'action': 'Payment processed',
+                'user': 'System',
+                'timestamp': transaction.get('timestamp').isoformat() if transaction.get('timestamp') else None
+            })
+
+        recent_activity = sorted(
+            recent_activity,
+            key=lambda item: item.get('timestamp') or '',
+            reverse=True
+        )[:8]
         
         stats = {
             'totalUsers': total_users,
@@ -113,6 +145,60 @@ def get_admin_stats():
         }
         
         return jsonify({'success': True, 'data': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/bookings', methods=['GET'])
+@jwt_required()
+def get_all_bookings():
+    """Get all bookings for admin"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        bookings_data = list(db.bookings.find({}).sort('created_at', -1))
+        bookings = [Booking.from_dict(data).to_response_dict() for data in bookings_data]
+        return jsonify({'success': True, 'data': bookings})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/sessions', methods=['GET'])
+@jwt_required()
+def get_all_sessions():
+    """Get all sessions for admin"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        sessions_data = list(db.sessions.find({}).sort('start_time', -1))
+        sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
+        return jsonify({'success': True, 'data': sessions})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/transactions', methods=['GET'])
+@jwt_required()
+def get_all_transactions():
+    """Get all transactions for admin"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        transactions_data = list(db.transactions.find({}).sort('timestamp', -1))
+        transactions = [Transaction.from_dict(data).to_response_dict() for data in transactions_data]
+        return jsonify({'success': True, 'data': transactions})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -275,7 +361,10 @@ def get_all_reviews():
         if rating_filter:
             query['rating'] = rating_filter
         if station_id:
-            query['station_id'] = station_id
+            station_oid = to_object_id(station_id)
+            if not station_oid:
+                return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
+            query['station_id'] = station_oid
         
         reviews_data = list(db.reviews.find(query).sort('timestamp', -1))
         reviews = [Review.from_dict(data).to_response_dict() for data in reviews_data]

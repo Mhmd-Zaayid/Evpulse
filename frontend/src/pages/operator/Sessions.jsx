@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth, useNotifications } from '../../context';
 import { sessionsAPI, stationsAPI } from '../../services';
-import { chargingStations, chargingSessions } from '../../services/mockData';
 import { formatCurrency, formatEnergy, formatDuration, formatDateTime, getStatusColor, getStatusText } from '../../utils';
 import { Button, Badge, Table, Select, LoadingSpinner, ProgressBar } from '../../components';
 import { Zap, Clock, Battery, User, Filter, RefreshCw } from 'lucide-react';
@@ -21,22 +20,30 @@ const Sessions = () => {
   }, []);
 
   const fetchData = async () => {
+    let stationsData = [];
     try {
       // Get stations for this operator
       const stationsRes = await stationsAPI.getByOperator(user.id);
-      setStations(stationsRes.data || []);
+      stationsData = stationsRes.data || [];
+      setStations(stationsData);
     } catch (error) {
       console.error('Failed to fetch stations:', error);
       setStations([]);
     }
     
     try {
-      // Get all sessions for operator's stations using mock data
-      const allSessions = chargingSessions.map(session => ({
-        ...session,
-        station: chargingStations.find(s => s.id === session.stationId),
-        user: { name: 'John Doe', email: 'user@example.com' }, // Mock user data
-      }));
+      const sessionResponses = await Promise.all(
+        stationsData.map((station) => sessionsAPI.getByStation(station.id))
+      );
+
+      const allSessions = sessionResponses
+        .filter((res) => res?.success)
+        .flatMap((res) => res.data || [])
+        .map((session) => ({
+          ...session,
+          station: stationsData.find((station) => station.id === session.stationId),
+        }));
+
       setSessions(allSessions);
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
@@ -53,7 +60,7 @@ const Sessions = () => {
 
   const filteredSessions = sessions.filter(session => {
     if (filter !== 'all' && session.status !== filter) return false;
-    if (selectedStation !== 'all' && session.stationId !== parseInt(selectedStation)) return false;
+    if (selectedStation !== 'all' && session.stationId !== selectedStation) return false;
     return true;
   });
 

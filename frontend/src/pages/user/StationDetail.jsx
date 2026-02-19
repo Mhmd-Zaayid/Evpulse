@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { stationsAPI, bookingsAPI, reviewsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
+import { stationsAPI, bookingsAPI, sessionsAPI, reviewsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
 import { getAiChargingOptimization, isAiConfigured } from '../../services/aiService';
 import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime } from '../../utils';
 import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
@@ -47,6 +47,7 @@ const StationDetail = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
   const [chargingProgress, setChargingProgress] = useState(0);
+  const [activeSessionId, setActiveSessionId] = useState(null);
   
   // AI-based states
   const [currentBattery, setCurrentBattery] = useState(35);
@@ -86,27 +87,9 @@ const StationDetail = () => {
       const response = await stationsAPI.getById(id);
       if (response.success && response.data) {
         setStation(response.data);
-      } else {
-        // If API fails, try to get from mock data
-        console.log('Fetching from mock data...');
-        const { chargingStations } = await import('../../services/mockData');
-        const mockStation = chargingStations.find(s => s.id === parseInt(id));
-        if (mockStation) {
-          setStation(mockStation);
-        }
       }
     } catch (error) {
       console.error('Failed to fetch station:', error);
-      // Fallback to mock data on error
-      try {
-        const { chargingStations } = await import('../../services/mockData');
-        const mockStation = chargingStations.find(s => s.id === parseInt(id));
-        if (mockStation) {
-          setStation(mockStation);
-        }
-      } catch (e) {
-        console.error('Failed to fetch mock station:', e);
-      }
     } finally {
       setLoading(false);
     }
@@ -209,6 +192,19 @@ const StationDetail = () => {
     }
 
     try {
+      const response = await bookingsAPI.create({
+        stationId: id,
+        portId: selectedPort?.id,
+        date: bookingData.date,
+        timeSlot: bookingData.timeSlot,
+        chargingType: selectedPort?.type || 'Normal AC',
+      });
+
+      if (!response.success) {
+        showToast({ type: 'error', message: response.error || 'Failed to book slot' });
+        return;
+      }
+
       showToast({ type: 'success', message: 'Booking confirmed successfully!' });
       setShowBookingModal(false);
       navigate('/user/bookings');
@@ -217,37 +213,64 @@ const StationDetail = () => {
     }
   };
 
-  const handleStartCharging = () => {
-    setIsCharging(true);
-    setShowChargingModal(true);
-    
-    // Simulate charging progress
-    const interval = setInterval(() => {
-      setChargingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 2;
+  const handleStartCharging = async () => {
+    if (!selectedPort) {
+      showToast({ type: 'error', message: 'Select an available port first' });
+      return;
+    }
+
+    try {
+      const response = await sessionsAPI.startSession({
+        stationId: id,
+        portId: selectedPort.id,
+        chargingType: selectedPort.type || 'Normal AC',
+        paymentMethod: 'Wallet',
+        batteryStart: currentBattery,
       });
-    }, 500);
+
+      if (!response.success) {
+        showToast({ type: 'error', message: response.error || 'Failed to start session' });
+        return;
+      }
+
+      setActiveSessionId(response.data?.id || null);
+      setIsCharging(true);
+      setShowChargingModal(true);
+      setChargingProgress(response.data?.progress || 0);
+      showToast({ type: 'success', message: 'Charging session started' });
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to start charging session' });
+    }
   };
 
-  const handleStopCharging = () => {
-    setIsCharging(false);
-    setChargingProgress(0);
-    setShowChargingModal(false);
-    showToast({ type: 'success', message: 'Charging session completed!' });
-    // Show rating modal after charging completes
-    setTimeout(() => setShowRatingModal(true), 500);
+  const handleStopCharging = async () => {
+    if (!activeSessionId) {
+      showToast({ type: 'error', message: 'No active session found' });
+      return;
+    }
+
+    try {
+      const response = await sessionsAPI.stopSession(activeSessionId);
+      if (!response.success) {
+        showToast({ type: 'error', message: response.error || 'Failed to stop session' });
+        return;
+      }
+
+      setIsCharging(false);
+      setChargingProgress(0);
+      setShowChargingModal(false);
+      setActiveSessionId(null);
+      showToast({ type: 'success', message: 'Charging session completed!' });
+      setTimeout(() => setShowRatingModal(true), 500);
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to stop charging session' });
+    }
   };
 
   const handleRatingSubmit = async (ratingData) => {
     try {
       await reviewsAPI.create({
-        stationId: parseInt(id),
-        userId: user?.id,
-        userName: user?.name,
+        stationId: id,
         ...ratingData,
       });
       showToast({ type: 'success', message: 'Thank you for your feedback!' });

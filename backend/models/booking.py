@@ -54,8 +54,8 @@ class Booking:
         """Convert to API response format"""
         return {
             'id': self.id if hasattr(self, 'id') else None,
-            'userId': self.user_id,
-            'stationId': self.station_id,
+            'userId': str(self.user_id) if self.user_id else None,
+            'stationId': str(self.station_id) if self.station_id else None,
             'portId': self.port_id,
             'date': self.date,
             'timeSlot': self.time_slot,

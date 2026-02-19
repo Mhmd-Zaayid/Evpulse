@@ -79,8 +79,8 @@ class Session:
         return {
             'id': self.id if hasattr(self, 'id') else None,
             'orderId': self.order_id,
-            'userId': self.user_id,
-            'stationId': self.station_id,
+            'userId': str(self.user_id) if self.user_id else None,
+            'stationId': str(self.station_id) if self.station_id else None,
             'portId': self.port_id,
             'startTime': self.start_time.isoformat() if self.start_time else None,
             'endTime': self.end_time.isoformat() if self.end_time else None,

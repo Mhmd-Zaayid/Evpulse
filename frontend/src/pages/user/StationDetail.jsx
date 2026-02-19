@@ -359,6 +359,8 @@ const StationDetail = () => {
     .split('\n')
     .map((line) => line.trim().replace(/^[-•*]\s*/, ''))
     .filter(Boolean);
+  const defaultAmenities = ['WiFi', 'Parking', 'Cafe', 'Restroom', 'Food Court', 'Vending Machine'];
+  const displayAmenities = Array.from(new Set([...(station.amenities || []), ...defaultAmenities]));
   const peakStart = station?.peakHours?.start;
   const peakEnd = station?.peakHours?.end;
   const peakHoursLabel = peakStart && peakEnd ? `${peakStart} - ${peakEnd}` : 'Not specified';
@@ -405,24 +407,19 @@ const StationDetail = () => {
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
+        {/* Quick Stats (dashboard-style) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="text-center p-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 shadow-sm">
             <Star className="w-6 h-6 text-amber-400 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{station.rating}</p>
             <p className="text-sm text-secondary-500">{station.totalReviews} reviews</p>
           </div>
-          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
-            <MapPin className="w-6 h-6 text-primary-500 mx-auto mb-1" />
-            <p className="text-lg font-bold text-secondary-900">{formatDistance(station.distance)}</p>
-            <p className="text-sm text-secondary-500">Distance</p>
-          </div>
-          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="text-center p-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 shadow-sm">
             <Zap className="w-6 h-6 text-green-500 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{availablePorts.length}/{station.ports.length}</p>
             <p className="text-sm text-secondary-500">Available Ports</p>
           </div>
-          <div className="text-center p-4 rounded-xl" style={{ backgroundColor: '#abf7b1' }}>
+          <div className="text-center p-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 shadow-sm">
             <Clock className="w-6 h-6 text-blue-500 mx-auto mb-1" />
             <p className="text-lg font-bold text-secondary-900">{station.operatingHours}</p>
             <p className="text-sm text-secondary-500">Hours</p>
@@ -779,7 +776,7 @@ const StationDetail = () => {
           <div className="card">
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Amenities</h2>
             <div className="grid grid-cols-2 gap-3">
-              {station.amenities.map((amenity) => {
+              {displayAmenities.map((amenity) => {
                 const Icon = getAmenityIcon(amenity);
                 return (
                   <div key={amenity} className="flex items-center gap-2 p-2 bg-secondary-50 rounded-lg">
@@ -789,18 +786,6 @@ const StationDetail = () => {
                 );
               })}
             </div>
-          </div>
-
-          {/* Location */}
-          <div className="card">
-            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Location</h2>
-            <div className="h-40 bg-secondary-100 rounded-xl flex items-center justify-center mb-3">
-              <MapPin className="w-8 h-8 text-secondary-400" />
-            </div>
-            <p className="text-sm text-secondary-600">{station.address}, {station.city}</p>
-            <Button variant="outline" fullWidth className="mt-3">
-              Get Directions
-            </Button>
           </div>
         </div>
       </div>

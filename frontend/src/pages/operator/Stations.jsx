@@ -35,8 +35,6 @@ const Stations = () => {
     city: '',
     operatingHours: '24/7',
     image: '',
-    latitude: '',
-    longitude: '',
     portCount: 2,
     basePrice: 12,
     peakPrice: 15,
@@ -93,8 +91,6 @@ const Stations = () => {
       city: '',
       operatingHours: '24/7',
       image: '',
-      latitude: '',
-      longitude: '',
       portCount: 2,
       basePrice: 12,
       peakPrice: 15,
@@ -112,8 +108,6 @@ const Stations = () => {
       const portCount = Math.max(1, Number(addData.portCount) || 1);
       const basePrice = Number(addData.basePrice) || 0;
       const peakPrice = Number(addData.peakPrice) || basePrice;
-      const latitude = addData.latitude === '' ? 0 : Number(addData.latitude);
-      const longitude = addData.longitude === '' ? 0 : Number(addData.longitude);
 
       const ports = Array.from({ length: portCount }, (_, index) => ({
         id: index + 1,
@@ -127,7 +121,7 @@ const Stations = () => {
         name: addData.name.trim(),
         address: addData.address.trim(),
         city: addData.city.trim(),
-        coordinates: { lat: latitude, lng: longitude },
+        coordinates: {},
         operatingHours: addData.operatingHours?.trim() || '24/7',
         image: addData.image?.trim() || null,
         amenities: [],
@@ -431,22 +425,6 @@ const Stations = () => {
               value={addData.image}
               onChange={(e) => setAddData(prev => ({ ...prev, image: e.target.value }))}
               placeholder="https://..."
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Latitude (optional)"
-              type="number"
-              step="0.000001"
-              value={addData.latitude}
-              onChange={(e) => setAddData(prev => ({ ...prev, latitude: e.target.value }))}
-            />
-            <Input
-              label="Longitude (optional)"
-              type="number"
-              step="0.000001"
-              value={addData.longitude}
-              onChange={(e) => setAddData(prev => ({ ...prev, longitude: e.target.value }))}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, useNotifications } from '../../context';
+import { useAuth } from '../../context';
 import { historyAPI, sessionsAPI, bookingsAPI, notificationsAPI } from '../../services';
 import { formatCurrency, formatDate, formatDuration, formatEnergy, formatRelativeTime } from '../../utils';
 import { Button, Badge, LoadingSpinner } from '../../components';
@@ -33,6 +33,20 @@ const Dashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const formatDashboardDateTime = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    const hour24 = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const period = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 || 12;
+    return `${day}-${month}-${year} ${String(hour12).padStart(2, '0')}:${minutes} ${period}`;
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, [user?.id]);
@@ -50,12 +64,45 @@ const Dashboard = () => {
       if (statsRes.success) setStats(statsRes.data);
       if (activeRes.success) setActiveSession(activeRes.data);
       if (bookingsRes.success) setUpcomingBookings(bookingsRes.data.filter(b => b.status === 'confirmed'));
-      if (historyRes.success) setRecentSessions(historyRes.data.slice(0, 3));
-      if (notifRes.success) setNotifications(notifRes.data.filter(n => !n.read).slice(0, 4));
+      if (historyRes.success) {
+        const normalizedSessions = (historyRes.data || []).map((session) => ({
+          ...session,
+          sessionDateTime: session.startTime || session.endTime || session.date || null,
+          sessionDuration: session.duration ?? 0,
+          sessionCost: session.cost ?? 0,
+          sessionEnergy: session.energyDelivered ?? session.energyConsumed ?? 0,
+        }));
+        setRecentSessions(normalizedSessions.slice(0, 3));
+      }
+      if (notifRes.success) {
+        const unreadNotifications = (notifRes.data || [])
+          .filter((notification) => !notification.read)
+          .sort((first, second) => new Date(second.timestamp || 0) - new Date(first.timestamp || 0))
+          .slice(0, 4);
+        setNotifications(unreadNotifications);
+      }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    try {
+      if (!notification?.read && notification?.id) {
+        await notificationsAPI.markAsRead(notification.id);
+        setNotifications((prev) => prev.filter((item) => item.id !== notification.id));
+      }
+
+      if (notification?.actionUrl) {
+        navigate(notification.actionUrl);
+      }
+    } catch (error) {
+      console.error('Failed to update notification state:', error);
+      if (notification?.actionUrl) {
+        navigate(notification.actionUrl);
+      }
     }
   };
 
@@ -83,7 +130,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -315,13 +362,13 @@ const Dashboard = () => {
                         <div>
                           <h3 className="font-medium text-secondary-900">{session.stationName}</h3>
                           <p className="text-sm text-secondary-500">
-                            {formatDate(session.date)} • {formatDuration(session.duration)}
+                            {formatDashboardDateTime(session.sessionDateTime)} • {formatDuration(session.sessionDuration)}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-primary-600">{formatCurrency(session.cost)}</p>
-                        <p className="text-sm text-secondary-500">{session.energyConsumed} kWh</p>
+                        <p className="font-semibold text-primary-600">{formatCurrency(session.sessionCost)}</p>
+                        <p className="text-sm text-secondary-500">{session.sessionEnergy} kWh</p>
                       </div>
                     </div>
                   </div>
@@ -349,7 +396,11 @@ const Dashboard = () => {
             {notifications.length > 0 ? (
               <div className="divide-y divide-secondary-100">
                 {notifications.map((notif) => (
-                  <div key={notif.id} className="p-4 hover:bg-secondary-50 transition-colors cursor-pointer">
+                  <div
+                    key={notif.id}
+                    className="p-4 hover:bg-secondary-50 transition-colors cursor-pointer"
+                    onClick={() => handleNotificationClick(notif)}
+                  >
                     <div className="flex gap-3">
                       {getNotificationIcon(notif.type)}
                       <div className="flex-1 min-w-0">

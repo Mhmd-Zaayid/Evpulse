@@ -29,19 +29,22 @@ const Payments = () => {
   const [topUpAmount, setTopUpAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [processing, setProcessing] = useState(false);
+  const [submittingTopUp, setSubmittingTopUp] = useState(false);
 
   useEffect(() => {
-    fetchPaymentData();
-  }, []);
+    if (user?.id) {
+      fetchPaymentData();
+    }
+  }, [user?.id]);
 
   const fetchPaymentData = async () => {
     try {
       const [transRes, walletRes] = await Promise.all([
-        transactionsAPI.getByUser(user.id),
-        transactionsAPI.getWalletBalance(user.id),
+        transactionsAPI.getByUser(),
+        transactionsAPI.getWalletBalance(user?.id),
       ]);
-      setTransactions(transRes.data);
-      setWalletBalance(walletRes.data.balance);
+      setTransactions(transRes?.data || []);
+      setWalletBalance(walletRes?.data?.balance || 0);
     } catch (error) {
       console.error('Failed to fetch payment data:', error);
     } finally {
@@ -67,24 +70,20 @@ const Payments = () => {
 
   const handlePaymentComplete = async () => {
     try {
-      const response = await transactionsAPI.topUpWallet(parseFloat(topUpAmount), paymentMethod);
+      setSubmittingTopUp(true);
+      const paymentMethodLabel = paymentMethod === 'card' ? 'Card' : paymentMethod === 'upi' ? 'UPI' : 'Wallet';
+      const response = await transactionsAPI.topUpWallet(parseFloat(topUpAmount), paymentMethodLabel);
       if (response.success) {
         setWalletBalance(response.data.newBalance);
-        setTransactions(prev => [{
-          id: response.data.transactionId,
-          userId: user.id,
-          amount: parseFloat(topUpAmount),
-          type: 'wallet_topup',
-          paymentMethod: paymentMethod === 'card' ? 'Card' : paymentMethod === 'upi' ? 'UPI' : 'Wallet',
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-          description: 'Wallet Top-up',
-        }, ...prev]);
+        await fetchPaymentData();
         showToast({ type: 'success', message: `Successfully added ${formatCurrency(parseFloat(topUpAmount))} to wallet` });
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Payment failed. Please try again.' });
       }
     } catch (error) {
       showToast({ type: 'error', message: 'Payment failed. Please try again.' });
     } finally {
+      setSubmittingTopUp(false);
       setProcessing(false);
       setShowPaymentModal(false);
       setTopUpAmount('');
@@ -105,7 +104,7 @@ const Payments = () => {
     {
       key: 'description',
       label: 'Description',
-      render: (row) => (
+      render: (value, row) => (
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
             row.type === 'charging' ? 'bg-primary-100' : 'bg-green-100'
@@ -117,7 +116,7 @@ const Payments = () => {
             )}
           </div>
           <div>
-            <p className="font-medium text-secondary-900">{row.description}</p>
+            <p className="font-medium text-secondary-900">{value || 'Transaction'}</p>
             <p className="text-sm text-secondary-500">{formatDateTime(row.timestamp)}</p>
           </div>
         </div>
@@ -126,13 +125,13 @@ const Payments = () => {
     {
       key: 'paymentMethod',
       label: 'Payment Method',
-      render: (row) => (
+      render: (value, row) => (
         <div className="flex items-center gap-2">
-          {row.paymentMethod === 'Card' && <CreditCard className="w-4 h-4 text-secondary-400" />}
-          {row.paymentMethod === 'UPI' && <Smartphone className="w-4 h-4 text-secondary-400" />}
-          {row.paymentMethod === 'Wallet' && <Wallet className="w-4 h-4 text-secondary-400" />}
+          {value === 'Card' && <CreditCard className="w-4 h-4 text-secondary-400" />}
+          {value === 'UPI' && <Smartphone className="w-4 h-4 text-secondary-400" />}
+          {value === 'Wallet' && <Wallet className="w-4 h-4 text-secondary-400" />}
           <span className="text-secondary-700">
-            {row.paymentMethod}
+            {value || 'N/A'}
             {row.cardLast4 && ` •••• ${row.cardLast4}`}
           </span>
         </div>
@@ -141,16 +140,16 @@ const Payments = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (row) => (
-        <Badge variant={row.status === 'completed' ? 'success' : 'warning'}>
-          {row.status}
+      render: (value) => (
+        <Badge variant={value === 'completed' ? 'success' : 'warning'}>
+          {value}
         </Badge>
       ),
     },
     {
       key: 'amount',
       label: 'Amount',
-      render: (row) => (
+      render: (value, row) => (
         <div className={`flex items-center gap-1 font-semibold ${
           row.type === 'charging' ? 'text-red-600' : 'text-green-600'
         }`}>
@@ -159,7 +158,7 @@ const Payments = () => {
           ) : (
             <ArrowDownRight className="w-4 h-4" />
           )}
-          {row.type === 'charging' ? '-' : '+'}{formatCurrency(row.amount)}
+          {row.type === 'charging' ? '-' : '+'}{formatCurrency(value)}
         </div>
       ),
     },
@@ -380,7 +379,7 @@ const Payments = () => {
               <p className="text-secondary-500 mt-1">
                 {formatCurrency(parseFloat(topUpAmount))} has been added to your wallet
               </p>
-              <Button fullWidth className="mt-6" onClick={handlePaymentComplete}>
+              <Button fullWidth className="mt-6" onClick={handlePaymentComplete} loading={submittingTopUp}>
                 Done
               </Button>
             </>

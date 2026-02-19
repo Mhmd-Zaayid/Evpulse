@@ -166,47 +166,47 @@ const Sessions = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <Zap className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{activeSessions.length}</p>
-              <p className="text-sm text-secondary-500">Active Sessions</p>
+              <p className="text-2xl font-bold text-white">{activeSessions.length}</p>
+              <p className="text-sm text-emerald-100/80">Active Sessions</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Clock className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <Clock className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{completedSessions.length}</p>
-              <p className="text-sm text-secondary-500">Completed Today</p>
+              <p className="text-2xl font-bold text-white">{completedSessions.length}</p>
+              <p className="text-sm text-emerald-100/80">Completed Today</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <Battery className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <Battery className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{formatEnergy(totalEnergy)}</p>
-              <p className="text-sm text-secondary-500">Energy Delivered</p>
+              <p className="text-2xl font-bold text-white">{formatEnergy(totalEnergy)}</p>
+              <p className="text-sm text-emerald-100/80">Energy Delivered</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <span className="text-purple-600 font-bold">₹</span>
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold">₹</span>
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{formatCurrency(totalRevenue)}</p>
-              <p className="text-sm text-secondary-500">Revenue</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(totalRevenue)}</p>
+              <p className="text-sm text-emerald-100/80">Revenue</p>
             </div>
           </div>
         </div>

@@ -155,19 +155,19 @@ const Reports = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((kpi) => (
-          <div key={kpi.label} className="card" style={{ backgroundColor: '#abf7b1' }}>
+          <div key={kpi.label} className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
             <div className="flex items-start justify-between">
-              <div className={`p-3 rounded-xl ${kpi.color}`}>
-                <kpi.icon className="w-6 h-6" />
+              <div className={`p-3 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300`}>
+                <kpi.icon className="w-6 h-6 text-white" />
               </div>
-              <div className={`flex items-center gap-1 text-sm font-medium ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`flex items-center gap-1 text-sm font-medium ${kpi.trend === 'up' ? 'text-green-200' : 'text-red-200'}`}>
                 {kpi.trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                 {kpi.change}
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-secondary-900">{kpi.value}</p>
-              <p className="text-sm text-secondary-500">{kpi.label}</p>
+              <p className="text-2xl font-bold text-white">{kpi.value}</p>
+              <p className="text-sm text-emerald-100/80">{kpi.label}</p>
             </div>
           </div>
         ))}

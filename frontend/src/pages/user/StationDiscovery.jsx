@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { stationsAPI } from '../../services';
+import { useNotifications } from '../../context';
 import { formatDistance } from '../../utils';
 import { StationCard, Button, Select, Input, LoadingSpinner, EmptyState } from '../../components';
 import { 
@@ -17,6 +18,7 @@ import {
 
 const StationDiscovery = () => {
   const navigate = useNavigate();
+  const { showToast } = useNotifications();
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('list');
@@ -38,9 +40,23 @@ const StationDiscovery = () => {
     setLoading(true);
     try {
       const response = await stationsAPI.getAll(filters);
-      setStations(response.data);
+      if (response?.success) {
+        const normalizedStations = (response.data || []).map((station) => ({
+          ...station,
+          name: station?.name || 'Unnamed Station',
+          address: station?.address || 'Address not available',
+          ports: Array.isArray(station?.ports) ? station.ports : [],
+          amenities: Array.isArray(station?.amenities) ? station.amenities : [],
+          pricing: station?.pricing || {},
+        }));
+        setStations(normalizedStations);
+      } else {
+        setStations([]);
+        showToast({ type: 'error', message: response?.error || 'Failed to fetch stations' });
+      }
     } catch (error) {
-      console.error('Failed to fetch stations:', error);
+      setStations([]);
+      showToast({ type: 'error', message: 'Failed to fetch stations' });
     } finally {
       setLoading(false);
     }
@@ -51,8 +67,8 @@ const StationDiscovery = () => {
   };
 
   const filteredStations = stations.filter(station => 
-    station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    station.address.toLowerCase().includes(searchQuery.toLowerCase())
+    (station.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (station.address || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const statusOptions = [

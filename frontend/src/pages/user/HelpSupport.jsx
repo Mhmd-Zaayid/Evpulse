@@ -119,7 +119,7 @@ const HelpSupport = () => {
       icon: Headphones,
       title: '24/7 Helpline',
       description: 'Speak with our support team anytime',
-      action: '+1 (800) EVP-ULSE',
+      action: '+91 (1800 4000 212) EVPULSE',
       actionType: 'phone'
     },
     {
@@ -180,14 +180,14 @@ const HelpSupport = () => {
       {/* Quick Contact Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {contactOptions.map((option, index) => (
-          <div key={index} className="card hover:shadow-xl transition-all duration-300 group" style={{ backgroundColor: '#abf7b1' }}>
+          <div key={index} className="card bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 border border-green-500/20 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 hover:scale-[1.02] group">
             <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-primary-500 transition-colors">
-                <option.icon className="w-6 h-6 text-primary-600 group-hover:text-white transition-colors" />
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center mb-3 shadow-lg shadow-emerald-500/30">
+                <option.icon className="w-6 h-6 text-green-900" />
               </div>
-              <h3 className="font-semibold text-secondary-900">{option.title}</h3>
-              <p className="text-sm text-secondary-500 mt-1">{option.description}</p>
-              <p className="text-primary-600 font-medium mt-2">{option.action}</p>
+              <h3 className="font-semibold text-white drop-shadow-md">{option.title}</h3>
+              <p className="text-sm text-emerald-100/80 mt-1 drop-shadow-sm">{option.description}</p>
+              <p className="text-emerald-100 font-medium mt-2 drop-shadow-sm">{option.action}</p>
             </div>
           </div>
         ))}

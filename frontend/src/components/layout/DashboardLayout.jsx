@@ -20,7 +20,7 @@ const DashboardLayout = ({ children }) => {
       {/* Main Content */}
       <div className="lg:pl-72 min-h-screen transition-all duration-300 flex flex-col relative z-10">
         <Navbar onMenuClick={() => setMobileOpen(!mobileOpen)} />
-        <main className="flex-1 w-full h-full">
+        <main className="flex-1 w-full h-full p-6">
           {children ?? <Outlet />}
         </main>
       </div>

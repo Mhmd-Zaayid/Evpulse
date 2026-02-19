@@ -135,13 +135,13 @@ const Reports = () => {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryStats.map((stat) => (
-          <div key={stat.label} className="card" style={{ backgroundColor: '#abf7b1' }}>
+          <div key={stat.label} className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
             <div className="flex items-start justify-between">
-              <div className={`p-3 rounded-xl ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+              <div className={`p-3 rounded-xl bg-gradient-to-br from-emerald-400 to-green-300`}>
+                <stat.icon className="w-6 h-6 text-white" />
               </div>
               <div className={`flex items-center gap-1 text-sm font-medium ${
-                stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
+                stat.trend === 'up' ? 'text-green-200' : 'text-red-200'
               }`}>
                 {stat.trend === 'up' ? (
                   <TrendingUp className="w-4 h-4" />
@@ -152,8 +152,8 @@ const Reports = () => {
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-secondary-900">{stat.value}</p>
-              <p className="text-sm text-secondary-500">{stat.label}</p>
+              <p className="text-2xl font-bold text-white">{stat.value}</p>
+              <p className="text-sm text-emerald-100/80">{stat.label}</p>
             </div>
           </div>
         ))}

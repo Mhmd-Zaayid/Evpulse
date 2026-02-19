@@ -267,47 +267,47 @@ const Users = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-              <UsersIcon className="w-6 h-6 text-primary-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <UsersIcon className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{stats.total}</p>
-              <p className="text-sm text-secondary-500">Total Users</p>
+              <p className="text-2xl font-bold text-white">{stats.total}</p>
+              <p className="text-sm text-emerald-100/80">Total Users</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{stats.active}</p>
-              <p className="text-sm text-secondary-500">Active</p>
+              <p className="text-2xl font-bold text-white">{stats.active}</p>
+              <p className="text-sm text-emerald-100/80">Active</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Shield className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{stats.operators}</p>
-              <p className="text-sm text-secondary-500">Operators</p>
+              <p className="text-2xl font-bold text-white">{stats.operators}</p>
+              <p className="text-sm text-emerald-100/80">Operators</p>
             </div>
           </div>
         </div>
-        <div className="card" style={{ backgroundColor: '#abf7b1' }}>
+        <div className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-300 rounded-xl flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900">{stats.pending}</p>
-              <p className="text-sm text-secondary-500">Pending</p>
+              <p className="text-2xl font-bold text-white">{stats.pending}</p>
+              <p className="text-sm text-emerald-100/80">Pending</p>
             </div>
           </div>
         </div>

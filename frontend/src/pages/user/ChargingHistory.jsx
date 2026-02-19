@@ -28,6 +28,27 @@ const ChargingHistory = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [filterPeriod, setFilterPeriod] = useState('all');
 
+  const formatDisplayDate = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    return `${day}-${month}-${year}`;
+  };
+
+  const formatDisplayTime = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    const hours = date.getHours();
+    const mins = String(date.getMinutes()).padStart(2, '0');
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    const twelveHour = hours % 12 || 12;
+    return `${String(twelveHour).padStart(2, '0')}:${mins} ${suffix}`;
+  };
+
   useEffect(() => {
     fetchHistory();
     fetchStats();
@@ -64,7 +85,8 @@ const ChargingHistory = () => {
 
   const filteredHistory = history.filter(session => {
     if (filterPeriod === 'all') return true;
-    const sessionDate = new Date(session.date);
+    const sessionDate = new Date(session.startTime || session.endTime || session.date);
+    if (Number.isNaN(sessionDate.getTime())) return false;
     const now = new Date();
     if (filterPeriod === 'week') {
       const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
@@ -238,11 +260,11 @@ const ChargingHistory = () => {
                       <div className="flex items-center gap-3 mt-1 text-sm text-secondary-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          {formatDate(session.date)}
+                          {formatDisplayDate(session.startTime || session.endTime || session.date)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          {session.startTime} - {session.endTime}
+                          {formatDisplayTime(session.startTime)} - {formatDisplayTime(session.endTime)}
                         </span>
                       </div>
                     </div>
@@ -312,10 +334,10 @@ const ChargingHistory = () => {
               <div className="p-4 bg-secondary-50 rounded-xl">
                 <p className="text-sm text-secondary-500 mb-1">Date & Time</p>
                 <p className="font-medium text-secondary-900">
-                  {formatDate(selectedSession.date)}
+                  {formatDisplayDate(selectedSession.startTime || selectedSession.endTime || selectedSession.date)}
                 </p>
                 <p className="text-sm text-secondary-600">
-                  {selectedSession.startTime} - {selectedSession.endTime}
+                  {formatDisplayTime(selectedSession.startTime)} - {formatDisplayTime(selectedSession.endTime)}
                 </p>
               </div>
               <div className="p-4 bg-secondary-50 rounded-xl">

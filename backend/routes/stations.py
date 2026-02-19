@@ -53,23 +53,28 @@ def get_all_stations():
         
         for data in stations_data:
             station = Station.from_dict(data)
-            
-            # Calculate distance
-            distance = calculate_distance(
-                user_lat, user_lng,
-                station.coordinates.get('lat', 0),
-                station.coordinates.get('lng', 0)
+
+            station_lat = station.coordinates.get('lat') if isinstance(station.coordinates, dict) else None
+            station_lng = station.coordinates.get('lng') if isinstance(station.coordinates, dict) else None
+            has_valid_coords = (
+                isinstance(station_lat, (int, float)) and
+                isinstance(station_lng, (int, float)) and
+                not (station_lat == 0 and station_lng == 0)
             )
+
+            distance = None
+            if has_valid_coords:
+                distance = calculate_distance(user_lat, user_lng, station_lat, station_lng)
+                if max_distance and distance > max_distance:
+                    continue
             
-            # Filter by max distance
-            if max_distance and distance > max_distance:
-                continue
-            
+            ports = station.ports if isinstance(station.ports, list) else []
+
             # Filter by charging type
             if charging_type and charging_type != 'all':
                 has_type = any(
                     charging_type.lower() in p.get('type', '').lower()
-                    for p in station.ports
+                    for p in ports
                 )
                 if not has_type:
                     continue
@@ -78,7 +83,7 @@ def get_all_stations():
         
         # Sort results
         if sort_by == 'distance':
-            stations.sort(key=lambda x: x.get('distance', float('inf')))
+            stations.sort(key=lambda x: x.get('distance') if x.get('distance') is not None else float('inf'))
         elif sort_by == 'rating':
             stations.sort(key=lambda x: x.get('rating', 0), reverse=True)
         

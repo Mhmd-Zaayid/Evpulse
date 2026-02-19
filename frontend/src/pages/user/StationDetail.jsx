@@ -82,6 +82,28 @@ const StationDetail = () => {
     }
   }, [currentBattery, targetBattery, station]);
 
+  useEffect(() => {
+    if (!showChargingModal || !isCharging) {
+      return;
+    }
+
+    const durationMs = 30000;
+    const tickMs = 300;
+    const timer = setInterval(() => {
+      setChargingProgress((prev) => {
+        const next = prev + (tickMs / durationMs) * 100;
+        if (next >= 100) {
+          clearInterval(timer);
+          setIsCharging(false);
+          return 100;
+        }
+        return Math.round(next * 10) / 10;
+      });
+    }, tickMs);
+
+    return () => clearInterval(timer);
+  }, [showChargingModal, isCharging]);
+
   const fetchStationDetails = async () => {
     try {
       const response = await stationsAPI.getById(id);
@@ -236,7 +258,7 @@ const StationDetail = () => {
       setActiveSessionId(response.data?.id || null);
       setIsCharging(true);
       setShowChargingModal(true);
-      setChargingProgress(response.data?.progress || 0);
+      setChargingProgress(0);
       showToast({ type: 'success', message: 'Charging session started' });
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to start charging session' });
@@ -325,6 +347,24 @@ const StationDetail = () => {
   }
 
   const availablePorts = station.ports.filter(p => p.status === 'available');
+  const selectedPortPrice = Number(selectedPort?.price || 0);
+  const selectedPortPower = Number(selectedPort?.power || 0);
+  const deliveredKwh = Number(((chargingProgress / 100) * (selectedPortPower > 0 ? selectedPortPower * 0.5 : 20)).toFixed(1));
+  const currentCost = Number((deliveredKwh * selectedPortPrice).toFixed(2));
+  const minutesLeft = Math.max(0, Math.ceil((100 - chargingProgress) * 0.3));
+  const aiEnergyRequired = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
+  const aiChargingMinutes = slotEstimate?.estimatedChargingTime || Math.ceil((aiEnergyRequired / Math.max(selectedPortPower || 22, 1)) * 60);
+  const aiEstimatedCost = Number((aiEnergyRequired * selectedPortPrice).toFixed(2));
+  const aiReportPoints = (aiReport || '')
+    .split('\n')
+    .map((line) => line.trim().replace(/^[-•*]\s*/, ''))
+    .filter(Boolean);
+  const peakStart = station?.peakHours?.start;
+  const peakEnd = station?.peakHours?.end;
+  const peakHoursLabel = peakStart && peakEnd ? `${peakStart} - ${peakEnd}` : 'Not specified';
+  const bestTimeLabel = peakStart && peakEnd
+    ? `Try before ${peakStart} or after ${peakEnd}`
+    : 'Prefer non-peak hours for better cost efficiency';
 
   return (
     <div className="space-y-6">
@@ -396,26 +436,32 @@ const StationDetail = () => {
           {/* AI Smart Recommendations removed — replaced by AI Charging Optimization below */}
 
           {/* AI Charging Optimization Report (moved up; themed like Smart Recommendations) */}
-          <div className="card bg-gradient-to-br from-primary-50 to-blue-50 border-primary-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-secondary-900">AI Charging Optimization</h2>
-                <Badge variant="info" size="sm">AI</Badge>
+          <div className="card border border-violet-200/70 bg-white">
+            <div className="rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 p-5 sm:p-6 text-white shadow-lg shadow-violet-500/20 mb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <Brain className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">AI Charging Optimization Report</h2>
+                    <p className="text-sm text-white/85 mt-1">Smart, data-driven charging insights for faster and more cost-efficient sessions.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchAiOptimization}
+                  disabled={aiLoading}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-700 bg-white hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${aiLoading ? 'animate-spin' : ''}`} />
+                  {aiLoading ? 'Analyzing...' : aiReport ? 'Re-analyze' : 'Analyze'}
+                </button>
               </div>
-              <button
-                onClick={fetchAiOptimization}
-                disabled={aiLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${aiLoading ? 'animate-spin' : ''}`} />
-                {aiLoading ? 'Analyzing...' : aiReport ? 'Re-analyze' : 'Analyze'}
-              </button>
             </div>
 
             {/* Configuration Inputs */}
-            <div className="mb-4 p-4 bg-white/60 rounded-xl">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div className="mb-5 p-4 sm:p-5 rounded-2xl border border-secondary-200 bg-secondary-50/70">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-xs font-medium text-secondary-600 mb-1 block">Vehicle Type</label>
                   <select
@@ -513,15 +559,83 @@ const StationDetail = () => {
               </div>
             )}
 
-            {/* AI Report Results — rendered as formatted text */}
+            {/* AI Report Results */}
             {aiReport && !aiLoading && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-violet-100/60 rounded-xl">
-                  <Sparkles className="w-5 h-5 text-violet-600" />
-                  <span className="text-sm font-semibold text-violet-800">⚡ AI Charging Optimization Report</span>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-emerald-700">Energy Required</span>
+                      <Battery className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-900">{aiEnergyRequired}</p>
+                    <p className="text-xs text-emerald-700/80">kWh</p>
+                  </div>
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-blue-700">Charging Time</span>
+                      <Timer className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">{aiChargingMinutes}</p>
+                    <p className="text-xs text-blue-700/80">minutes</p>
+                  </div>
+                  <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-violet-700">Estimated Cost</span>
+                      <TrendingUp className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-violet-900">{formatCurrency(aiEstimatedCost)}</p>
+                    <p className="text-xs text-violet-700/80">for target charge</p>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-cyan-700">Target Battery</span>
+                      <Zap className="w-4 h-4 text-cyan-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-cyan-900">{targetBattery}%</p>
+                    <p className="text-xs text-cyan-700/80">goal level</p>
+                  </div>
                 </div>
-                <div className="p-4 bg-white rounded-xl shadow-sm border border-violet-100">
-                  <p className="text-sm text-secondary-800 leading-relaxed whitespace-pre-wrap">{aiReport}</p>
+
+                <div className="rounded-2xl border border-secondary-200 bg-white p-5 shadow-sm">
+                  <div className="pb-3 border-b border-secondary-100 flex items-center gap-2">
+                    <Info className="w-4 h-4 text-secondary-500" />
+                    <h3 className="text-base font-semibold text-secondary-900">Detailed Breakdown</h3>
+                  </div>
+                  <div className="pt-4 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">AI Report Highlights</p>
+                      <ul className="space-y-2">
+                        {aiReportPoints.map((line, index) => (
+                          <li key={`${line}-${index}`} className="flex items-start gap-2 text-sm text-secondary-700">
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Session Inputs</p>
+                      <ul className="space-y-2 text-sm text-secondary-700">
+                        <li className="flex items-center justify-between"><span>Vehicle type</span><strong className="text-secondary-900">{vehicleType}</strong></li>
+                        <li className="flex items-center justify-between"><span>Battery capacity</span><strong className="text-secondary-900">{batteryCapacity} kWh</strong></li>
+                        <li className="flex items-center justify-between"><span>Current → Target</span><strong className="text-secondary-900">{currentBattery}% → {targetBattery}%</strong></li>
+                        <li className="flex items-center justify-between"><span>Peak hours</span><strong className="text-secondary-900">{peakHoursLabel}</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-base font-semibold text-emerald-900">Charging Recommendation</h3>
+                  </div>
+                  <div className="space-y-1.5 text-sm text-emerald-800">
+                    <p>Best charging window: <strong>{bestTimeLabel}</strong></p>
+                    <p>Peak hours: <strong>{peakHoursLabel}</strong></p>
+                    <p>Cost insight: <strong>Charging outside peak windows can improve cost efficiency</strong>.</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -816,15 +930,15 @@ const StationDetail = () => {
 
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-secondary-900">{(chargingProgress * 0.5).toFixed(1)}</p>
+              <p className="text-2xl font-bold text-secondary-900">{deliveredKwh}</p>
               <p className="text-sm text-secondary-500">kWh Delivered</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-secondary-900">{Math.round((100 - chargingProgress) * 0.3)}</p>
+              <p className="text-2xl font-bold text-secondary-900">{minutesLeft}</p>
               <p className="text-sm text-secondary-500">Minutes Left</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-primary-600">{formatCurrency(chargingProgress * 0.175)}</p>
+              <p className="text-2xl font-bold text-primary-600">{formatCurrency(currentCost)}</p>
               <p className="text-sm text-secondary-500">Current Cost</p>
             </div>
           </div>

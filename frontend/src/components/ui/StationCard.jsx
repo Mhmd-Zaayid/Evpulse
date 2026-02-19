@@ -1,10 +1,17 @@
 import { MapPin, Star, Zap, Clock, ChevronRight, Navigation, Plug } from 'lucide-react';
-import { formatDistance, getStatusColor, getStatusText } from '../../utils';
+import { formatCurrency, formatDistance, getStatusColor, getStatusText } from '../../utils';
 
 const StationCard = ({ station, onClick, compact = false }) => {
   const availablePorts = station.ports?.filter(p => p.status === 'available').length || 0;
   const totalPorts = station.ports?.length || 0;
   const portTypes = [...new Set(station.ports?.map(p => p.type) || [])];
+  const firstPortPrice = station.ports?.find((p) => p?.price != null)?.price;
+  const normalizedPricePerKwh =
+    firstPortPrice ??
+    station.pricing?.normal?.base ??
+    station.pricing?.fast?.base ??
+    station.pricing?.perKwh ??
+    0;
 
   if (compact) {
     return (
@@ -147,7 +154,7 @@ const StationCard = ({ station, onClick, compact = false }) => {
           
           <div className="text-right">
             <p className="text-lg font-bold text-primary-600">
-              ${station.pricing?.perKwh || '0.35'}<span className="text-xs font-normal text-secondary-500">/kWh</span>
+              {formatCurrency(normalizedPricePerKwh)}<span className="text-xs font-normal text-secondary-500">/kWh</span>
             </p>
           </div>
         </div>

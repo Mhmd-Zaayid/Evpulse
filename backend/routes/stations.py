@@ -9,6 +9,26 @@ from routes.common import role_required, to_object_id, now_utc
 
 stations_bp = Blueprint('stations', __name__)
 
+
+def _build_user_name_map(db, user_ids):
+    valid_ids = []
+    for user_id in user_ids:
+        oid = to_object_id(user_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    users = list(db.users.find(
+        {'_id': {'$in': valid_ids}},
+        {'name': 1, 'email': 1}
+    ))
+    return {
+        str(user['_id']): user.get('name') or user.get('email') or 'Unknown Operator'
+        for user in users
+    }
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calculate distance between two coordinates in km using Haversine formula"""
     R = 6371  # Earth's radius in km
@@ -49,6 +69,7 @@ def get_all_stations():
         
         # Fetch from MongoDB database
         stations_data = list(db.stations.find(query))
+        operator_name_map = _build_user_name_map(db, [data.get('operator_id') for data in stations_data])
         stations = []
         
         for data in stations_data:
@@ -79,7 +100,12 @@ def get_all_stations():
                 if not has_type:
                     continue
             
-            stations.append(station.to_response_dict(distance=distance))
+            station_response = station.to_response_dict(distance=distance)
+            station_response['operatorName'] = operator_name_map.get(
+                station_response.get('operatorId'),
+                'Unknown Operator'
+            )
+            stations.append(station_response)
         
         # Sort results
         if sort_by == 'distance':
@@ -105,7 +131,13 @@ def get_station_by_id(station_id):
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         
         station = Station.from_dict(station_data)
-        return jsonify({'success': True, 'data': station.to_response_dict()})
+        station_response = station.to_response_dict()
+        operator_name_map = _build_user_name_map(db, [station_response.get('operatorId')])
+        station_response['operatorName'] = operator_name_map.get(
+            station_response.get('operatorId'),
+            'Unknown Operator'
+        )
+        return jsonify({'success': True, 'data': station_response})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -122,7 +154,15 @@ def get_stations_by_operator(operator_id):
             return jsonify({'success': False, 'error': 'Invalid operator id'}), 400
 
         stations_data = list(db.stations.find({'operator_id': op_oid}))
-        stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
+        operator_name_map = _build_user_name_map(db, [data.get('operator_id') for data in stations_data])
+        stations = []
+        for data in stations_data:
+            station_response = Station.from_dict(data).to_response_dict()
+            station_response['operatorName'] = operator_name_map.get(
+                station_response.get('operatorId'),
+                'Unknown Operator'
+            )
+            stations.append(station_response)
         
         return jsonify({'success': True, 'data': stations})
     except Exception as e:

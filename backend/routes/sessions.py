@@ -10,6 +10,69 @@ sessions_bp = Blueprint('sessions', __name__)
 
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
 
+
+def _build_user_name_map(db, user_ids):
+    valid_ids = []
+    for user_id in user_ids:
+        oid = to_object_id(user_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    users = list(db.users.find({'_id': {'$in': valid_ids}}, {'name': 1, 'email': 1}))
+    return {
+        str(user['_id']): user.get('name') or user.get('email') or 'Unknown User'
+        for user in users
+    }
+
+
+def _build_station_map(db, station_ids):
+    valid_ids = []
+    for station_id in station_ids:
+        oid = to_object_id(station_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    stations = list(db.stations.find(
+        {'_id': {'$in': valid_ids}},
+        {'name': 1, 'operator_id': 1}
+    ))
+    return {
+        str(station['_id']): {
+            'name': station.get('name') or 'Unknown Station',
+            'operatorId': str(station.get('operator_id')) if station.get('operator_id') else None,
+        }
+        for station in stations
+    }
+
+
+def _enrich_sessions(db, sessions):
+    station_map = _build_station_map(db, [session.get('stationId') for session in sessions])
+    user_name_map = _build_user_name_map(db, [session.get('userId') for session in sessions])
+    operator_name_map = _build_user_name_map(
+        db,
+        [station_map.get(session.get('stationId'), {}).get('operatorId') for session in sessions]
+    )
+
+    enriched = []
+    for session in sessions:
+        station_meta = station_map.get(session.get('stationId'), {})
+        operator_id = station_meta.get('operatorId')
+        enriched.append({
+            **session,
+            'userName': user_name_map.get(session.get('userId'), 'Unknown User'),
+            'stationName': station_meta.get('name', 'Unknown Station'),
+            'operatorId': operator_id,
+            'operatorName': operator_name_map.get(operator_id, 'Unknown Operator') if operator_id else 'Unknown Operator',
+        })
+
+    return enriched
+
 @sessions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
 def get_sessions():
@@ -27,6 +90,7 @@ def get_sessions():
 
         sessions_data = list(db.sessions.find(query).sort('start_time', -1))
         sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
+        sessions = _enrich_sessions(db, sessions)
         
         return jsonify({'success': True, 'data': sessions})
     except Exception as e:
@@ -60,7 +124,8 @@ def get_active_session(user_id):
         
         if session_data:
             session = Session.from_dict(session_data)
-            return jsonify({'success': True, 'data': session.to_response_dict()})
+            enriched = _enrich_sessions(db, [session.to_response_dict()])
+            return jsonify({'success': True, 'data': enriched[0] if enriched else None})
         
         return jsonify({'success': True, 'data': None})
     except Exception as e:
@@ -212,8 +277,9 @@ def stop_session(session_id):
         # Get updated session
         updated_session = db.sessions.find_one({'_id': session_oid})
         session = Session.from_dict(updated_session)
-        
-        return jsonify({'success': True, 'data': session.to_response_dict()})
+        enriched = _enrich_sessions(db, [session.to_response_dict()])
+
+        return jsonify({'success': True, 'data': enriched[0] if enriched else None})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -235,6 +301,7 @@ def get_station_sessions(station_id):
 
         sessions_data = list(db.sessions.find({'station_id': station_oid}).sort('start_time', -1))
         sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
+        sessions = _enrich_sessions(db, sessions)
         
         return jsonify({'success': True, 'data': sessions})
     except Exception as e:
@@ -260,12 +327,22 @@ def get_charging_history(user_id):
         }).sort('start_time', -1))
         
         history = []
+        user_name_map = _build_user_name_map(db, [target_user_id])
+        station_map = _build_station_map(db, [data.get('station_id') for data in sessions_data])
+        operator_name_map = _build_user_name_map(
+            db,
+            [station_map.get(str(data.get('station_id')), {}).get('operatorId') for data in sessions_data]
+        )
+
         for data in sessions_data:
             session = Session.from_dict(data)
-            station = db.stations.find_one({'_id': to_object_id(session.station_id)})
-            
             history_item = session.to_response_dict()
-            history_item['stationName'] = station['name'] if station else 'Unknown Station'
+            station_meta = station_map.get(history_item.get('stationId'), {})
+            operator_id = station_meta.get('operatorId')
+
+            history_item['stationName'] = station_meta.get('name', 'Unknown Station')
+            history_item['userName'] = user_name_map.get(str(target_user_id), current.get('name') or 'Unknown User')
+            history_item['operatorName'] = operator_name_map.get(operator_id, 'Unknown Operator') if operator_id else 'Unknown Operator'
             history.append(history_item)
         
         return jsonify({'success': True, 'data': history})

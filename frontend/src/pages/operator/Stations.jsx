@@ -11,7 +11,6 @@ import {
   MapPin,
   Zap,
   DollarSign,
-  Settings,
   MoreVertical,
   Power,
 } from 'lucide-react';
@@ -24,7 +23,6 @@ const Stations = () => {
   const [loading, setLoading] = useState(true);
   const [selectedStation, setSelectedStation] = useState(null);
   const [showPricingModal, setShowPricingModal] = useState(false);
-  const [showPortModal, setShowPortModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [creatingStation, setCreatingStation] = useState(false);
@@ -353,13 +351,6 @@ const Stations = () => {
                           onClick={() => handleTogglePort(station.id, port.id, port.status)}
                         >
                           <Power className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          <Settings className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>

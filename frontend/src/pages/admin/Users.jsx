@@ -7,7 +7,6 @@ import {
   Users as UsersIcon,
   Search,
   Filter,
-  Plus,
   Edit,
   Trash2,
   MoreVertical,
@@ -19,7 +18,6 @@ import {
   CheckCircle,
   XCircle,
   Eye,
-  Download,
 } from 'lucide-react';
 
 const Users = () => {
@@ -255,14 +253,6 @@ const Users = () => {
           <h1 className="text-2xl font-bold text-secondary-900 ml-4">User Management</h1>
           <p className="text-secondary-500 mt-1 ml-4">Manage users, operators, and admins</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" icon={Download}>
-            Export
-          </Button>
-          <Button icon={Plus}>
-            Add User
-          </Button>
-        </div>
       </div>
 
       {/* Stats */}
@@ -441,7 +431,6 @@ const Users = () => {
             <Select label="Status" defaultValue={selectedUser.status}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
             </Select>
             <div className="flex gap-3 mt-6">
               <Button

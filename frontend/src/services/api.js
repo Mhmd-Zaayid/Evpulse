@@ -581,6 +581,12 @@ export const adminFeedbackAPI = {
       const stats = statsRes.data || {};
       const reviews = reviewsRes.data || [];
       const stations = stationsRes.data || [];
+      const stationOperatorMap = Object.fromEntries(
+        stations.map((station) => [
+          station.id,
+          station.operatorName || 'Unknown Operator',
+        ])
+      );
 
       const topStations = [...stations]
         .sort((a, b) => (b.rating || 0) - (a.rating || 0))
@@ -588,7 +594,7 @@ export const adminFeedbackAPI = {
         .map((s) => ({
           id: s.id,
           name: s.name,
-          operatorName: s.operatorId,
+          operatorName: s.operatorName || 'Unknown Operator',
           rating: s.rating || 0,
           reviewCount: s.totalReviews || 0,
         }));
@@ -600,7 +606,7 @@ export const adminFeedbackAPI = {
         .map((s) => ({
           id: s.id,
           name: s.name,
-          operatorName: s.operatorId,
+          operatorName: s.operatorName || 'Unknown Operator',
           rating: s.rating || 0,
           reviewCount: s.totalReviews || 0,
         }));
@@ -608,7 +614,7 @@ export const adminFeedbackAPI = {
       const normalizedReviews = reviews.map((review) => ({
         ...review,
         stationName: review.stationName || review.stationId,
-        operatorName: review.operatorName || 'Operator',
+        operatorName: review.operatorName || stationOperatorMap[review.stationId] || 'Unknown Operator',
         status: review.status || 'pending',
         createdAt: review.timestamp,
       }));

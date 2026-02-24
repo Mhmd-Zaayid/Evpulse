@@ -13,6 +13,49 @@ admin_bp = Blueprint('admin', __name__)
 
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
 
+
+def _build_user_name_map(db, user_ids):
+    valid_ids = []
+    for user_id in user_ids:
+        oid = to_object_id(user_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    users = list(db.users.find(
+        {'_id': {'$in': valid_ids}},
+        {'name': 1, 'email': 1}
+    ))
+    return {
+        str(user['_id']): user.get('name') or user.get('email') or 'Unknown User'
+        for user in users
+    }
+
+
+def _build_station_meta_map(db, station_ids):
+    valid_ids = []
+    for station_id in station_ids:
+        oid = to_object_id(station_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    stations = list(db.stations.find(
+        {'_id': {'$in': valid_ids}},
+        {'name': 1, 'operator_id': 1}
+    ))
+    return {
+        str(station['_id']): {
+            'name': station.get('name') or 'Unknown Station',
+            'operatorId': str(station.get('operator_id')) if station.get('operator_id') else None,
+        }
+        for station in stations
+    }
+
 def require_admin():
     """Check admin role. Returns (is_admin, db) tuple."""
     db = get_db()
@@ -180,6 +223,21 @@ def get_all_sessions():
 
         sessions_data = list(db.sessions.find({}).sort('start_time', -1))
         sessions = [Session.from_dict(data).to_response_dict() for data in sessions_data]
+        user_name_map = _build_user_name_map(db, [session.get('userId') for session in sessions])
+        station_meta_map = _build_station_meta_map(db, [session.get('stationId') for session in sessions])
+        operator_name_map = _build_user_name_map(
+            db,
+            [station_meta_map.get(session.get('stationId'), {}).get('operatorId') for session in sessions]
+        )
+
+        for session in sessions:
+            station_meta = station_meta_map.get(session.get('stationId'), {})
+            operator_id = station_meta.get('operatorId')
+            session['userName'] = user_name_map.get(session.get('userId'), 'Unknown User')
+            session['stationName'] = station_meta.get('name', 'Unknown Station')
+            session['operatorId'] = operator_id
+            session['operatorName'] = operator_name_map.get(operator_id, 'Unknown Operator') if operator_id else 'Unknown Operator'
+
         return jsonify({'success': True, 'data': sessions})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -198,6 +256,11 @@ def get_all_transactions():
 
         transactions_data = list(db.transactions.find({}).sort('timestamp', -1))
         transactions = [Transaction.from_dict(data).to_response_dict() for data in transactions_data]
+        user_name_map = _build_user_name_map(db, [txn.get('userId') for txn in transactions])
+
+        for txn in transactions:
+            txn['userName'] = user_name_map.get(txn.get('userId'), 'Unknown User')
+
         return jsonify({'success': True, 'data': transactions})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -240,6 +303,13 @@ def get_all_stations():
         
         stations_data = list(db.stations.find({}))
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
+        operator_name_map = _build_user_name_map(db, [station.get('operatorId') for station in stations])
+
+        for station in stations:
+            station['operatorName'] = operator_name_map.get(
+                station.get('operatorId'),
+                'Unknown Operator'
+            )
         
         return jsonify({'success': True, 'data': stations})
     except Exception as e:

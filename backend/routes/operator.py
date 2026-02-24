@@ -168,7 +168,14 @@ def get_operator_stations():
         if not user_id:
             return jsonify({'success': False, 'error': 'Invalid user id'}), 401
         stations_data = list(db.stations.find({'operator_id': user_id}))
-        stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
+        current_user = db.users.find_one({'_id': user_id}, {'name': 1, 'email': 1})
+        operator_name = (current_user or {}).get('name') or (current_user or {}).get('email') or 'Unknown Operator'
+
+        stations = []
+        for data in stations_data:
+            station_response = Station.from_dict(data).to_response_dict()
+            station_response['operatorName'] = operator_name
+            stations.append(station_response)
         
         return jsonify({'success': True, 'data': stations})
     except Exception as e:

@@ -41,6 +41,7 @@ const Transactions = () => {
       if (response?.success) {
         const mappedTransactions = (response.data || []).map((txn) => ({
           id: txn.id,
+          userName: txn.userName || 'Unknown User',
           userId: txn.userId || 'N/A',
           type: txn.type || 'charging',
           amount: Number(txn.amount || 0),
@@ -64,6 +65,7 @@ const Transactions = () => {
 
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = txn.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         txn.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          txn.userId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || txn.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || txn.status === statusFilter;
@@ -132,12 +134,11 @@ const Transactions = () => {
       ),
     },
     {
-      key: 'userId',
+      key: 'userName',
       label: 'User',
       render: (value, row) => (
         <div>
           <p className="font-medium text-secondary-900">{value}</p>
-          <p className="text-sm text-secondary-500">Session: {row.sessionId}</p>
         </div>
       ),
     },

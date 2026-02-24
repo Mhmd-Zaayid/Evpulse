@@ -34,7 +34,7 @@ const Stations = () => {
   const [selectedStation, setSelectedStation] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const operators = [...new Map(stations.map((s) => [s.operatorId, { id: s.operatorId, name: s.operator || s.operatorId }])).values()]
+  const operators = [...new Map(stations.map((s) => [s.operatorId, { id: s.operatorId, name: s.operator || 'Unknown Operator' }])).values()]
     .filter((operator) => operator.id);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ const Stations = () => {
             id: station.id,
             name: station.name || 'Unknown Station',
             address: station.address || 'N/A',
-            operator: station.operatorName || station.operatorId || 'N/A',
+            operator: station.operatorName || station.operator || 'Unknown Operator',
             operatorId: station.operatorId || '',
             status: station.status || 'offline',
             ports: ports.length,
@@ -463,7 +463,6 @@ const Stations = () => {
                 <option value="available">Available</option>
                 <option value="busy">Busy</option>
                 <option value="offline">Offline</option>
-                <option value="maintenance">Maintenance</option>
               </Select>
             </div>
             <div className="flex gap-3 mt-6">

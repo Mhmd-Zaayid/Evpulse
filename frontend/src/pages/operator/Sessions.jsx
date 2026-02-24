@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth, useNotifications } from '../../context';
 import { sessionsAPI, stationsAPI } from '../../services';
-import { formatCurrency, formatEnergy, formatDuration, formatDateTime, getStatusColor, getStatusText } from '../../utils';
+import { formatCurrency, formatEnergy, formatDuration, formatDateTime, getStatusText } from '../../utils';
 import { Button, Badge, Table, Select, LoadingSpinner, ProgressBar } from '../../components';
-import { Zap, Clock, Battery, User, Filter, RefreshCw } from 'lucide-react';
+import { Zap, Clock, Battery, RefreshCw } from 'lucide-react';
 
 const Sessions = () => {
   const { user } = useAuth();
@@ -41,7 +41,12 @@ const Sessions = () => {
         .flatMap((res) => res.data || [])
         .map((session) => ({
           ...session,
-          station: stationsData.find((station) => station.id === session.stationId),
+          station: stationsData.find((station) => station.id === session.stationId) || {
+            id: session.stationId,
+            name: session.stationName || 'Unknown Station',
+          },
+          userName: session.userName || 'Unknown User',
+          operatorName: session.operatorName || user?.name || 'Unknown Operator',
         }));
 
       setSessions(allSessions);
@@ -82,7 +87,7 @@ const Sessions = () => {
           </div>
           <div>
             <p className="font-medium text-secondary-900">{row.orderId || `#${row.id}`}</p>
-            <p className="text-sm text-secondary-500">{row.chargingType}</p>
+            <p className="text-sm text-secondary-500">{row.userName}</p>
           </div>
         </div>
       ),
@@ -92,8 +97,8 @@ const Sessions = () => {
       label: 'Station',
       render: (_, row) => (
         <div>
-          <p className="font-medium text-secondary-900">{row.station?.name}</p>
-          <p className="text-sm text-secondary-500">Port #{row.portId}</p>
+          <p className="font-medium text-secondary-900">{row.station?.name || row.stationName}</p>
+          <p className="text-sm text-secondary-500">Operator: {row.operatorName}</p>
         </div>
       ),
     },
@@ -224,8 +229,8 @@ const Sessions = () => {
               <div key={session.id} className="p-4 bg-white rounded-xl">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="font-medium text-secondary-900">{session.station?.name}</p>
-                    <p className="text-sm text-secondary-500">Port #{session.portId}</p>
+                    <p className="font-medium text-secondary-900">{session.station?.name || session.stationName}</p>
+                    <p className="text-sm text-secondary-500">{session.userName}</p>
                   </div>
                   <Badge variant="success">Active</Badge>
                 </div>

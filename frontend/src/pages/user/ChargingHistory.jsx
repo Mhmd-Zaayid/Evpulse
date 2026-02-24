@@ -58,7 +58,12 @@ const ChargingHistory = () => {
     try {
       const response = await historyAPI.getByUser(user?.id);
       if (response.success) {
-        setHistory(response.data);
+        const normalizedHistory = (response.data || []).map((session) => ({
+          ...session,
+          userName: session.userName || user?.name || 'Unknown User',
+          operatorName: session.operatorName || 'Unknown Operator',
+        }));
+        setHistory(normalizedHistory);
       }
     } catch (error) {
       console.error('Failed to fetch history:', error);
@@ -257,6 +262,7 @@ const ChargingHistory = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-secondary-900">{session.stationName}</h3>
+                      <p className="text-xs text-secondary-500">{session.userName}</p>
                       <div className="flex items-center gap-3 mt-1 text-sm text-secondary-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
@@ -325,7 +331,7 @@ const ChargingHistory = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-secondary-900">{selectedSession.stationName}</h3>
-                <p className="text-sm text-secondary-500">{selectedSession.chargingType}</p>
+                <p className="text-sm text-secondary-500">{selectedSession.userName} • {selectedSession.chargingType}</p>
               </div>
             </div>
 

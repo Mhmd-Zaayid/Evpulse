@@ -349,16 +349,29 @@ const StationDetail = () => {
   const availablePorts = station.ports.filter(p => p.status === 'available');
   const selectedPortPrice = Number(selectedPort?.price || 0);
   const selectedPortPower = Number(selectedPort?.power || 0);
+  const aiEffectivePort =
+    selectedPort ||
+    station.ports.find((p) => p.status === 'available') ||
+    station.ports[0] ||
+    null;
+  const aiEffectivePrice = Number(
+    aiEffectivePort?.price ??
+      station.pricing?.normal?.base ??
+      station.pricing?.fast?.base ??
+      station.pricing?.perKwh ??
+      0
+  );
   const deliveredKwh = Number(((chargingProgress / 100) * (selectedPortPower > 0 ? selectedPortPower * 0.5 : 20)).toFixed(1));
   const currentCost = Number((deliveredKwh * selectedPortPrice).toFixed(2));
   const minutesLeft = Math.max(0, Math.ceil((100 - chargingProgress) * 0.3));
   const aiEnergyRequired = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
   const aiChargingMinutes = slotEstimate?.estimatedChargingTime || Math.ceil((aiEnergyRequired / Math.max(selectedPortPower || 22, 1)) * 60);
-  const aiEstimatedCost = Number((aiEnergyRequired * selectedPortPrice).toFixed(2));
+  const aiEstimatedCost = Number((aiEnergyRequired * aiEffectivePrice).toFixed(2));
   const aiReportPoints = (aiReport || '')
     .split('\n')
     .map((line) => line.trim().replace(/^[-•*]\s*/, ''))
     .filter(Boolean);
+  const aiBriefPoints = aiReportPoints.slice(0, 3);
   const defaultAmenities = ['WiFi', 'Parking', 'Cafe', 'Restroom', 'Food Court', 'Vending Machine'];
   const displayAmenities = Array.from(new Set([...(station.amenities || []), ...defaultAmenities]));
   const peakStart = station?.peakHours?.start;
@@ -597,13 +610,13 @@ const StationDetail = () => {
                 <div className="rounded-2xl border border-secondary-200 bg-white p-5 shadow-sm">
                   <div className="pb-3 border-b border-secondary-100 flex items-center gap-2">
                     <Info className="w-4 h-4 text-secondary-500" />
-                    <h3 className="text-base font-semibold text-secondary-900">Detailed Breakdown</h3>
+                    <h3 className="text-base font-semibold text-secondary-900">Key Breakdown</h3>
                   </div>
-                  <div className="pt-4 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="pt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">AI Report Highlights</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Top Highlights</p>
                       <ul className="space-y-2">
-                        {aiReportPoints.map((line, index) => (
+                        {(aiBriefPoints.length > 0 ? aiBriefPoints : ['Charge outside peak hours for better cost efficiency.']).map((line, index) => (
                           <li key={`${line}-${index}`} className="flex items-start gap-2 text-sm text-secondary-700">
                             <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
                             <span>{line}</span>
@@ -612,12 +625,12 @@ const StationDetail = () => {
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Session Inputs</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Essential Inputs</p>
                       <ul className="space-y-2 text-sm text-secondary-700">
                         <li className="flex items-center justify-between"><span>Vehicle type</span><strong className="text-secondary-900">{vehicleType}</strong></li>
                         <li className="flex items-center justify-between"><span>Battery capacity</span><strong className="text-secondary-900">{batteryCapacity} kWh</strong></li>
                         <li className="flex items-center justify-between"><span>Current → Target</span><strong className="text-secondary-900">{currentBattery}% → {targetBattery}%</strong></li>
-                        <li className="flex items-center justify-between"><span>Peak hours</span><strong className="text-secondary-900">{peakHoursLabel}</strong></li>
+                        <li className="flex items-center justify-between"><span>Rate used</span><strong className="text-secondary-900">{formatCurrency(aiEffectivePrice)}/kWh</strong></li>
                       </ul>
                     </div>
                   </div>

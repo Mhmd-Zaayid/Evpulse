@@ -203,6 +203,11 @@ Created by `python scripts/seed_db.py`:
 - Check `VITE_API_URL` if set
 - Confirm browser requests target `/api/...`
 
+## Recent Changes
+
+- Session and transaction payloads are enriched with dynamic `userName` and `operatorName` values from database records.
+- Admin transaction list hides the session subtitle under user names for cleaner display.
+- User station AI analyze includes corrected estimated cost calculation and a shortened key breakdown view.
+
 ---
 
-Last updated: 2026-02-19

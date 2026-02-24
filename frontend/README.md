@@ -54,7 +54,9 @@ If omitted, the app defaults to `http://localhost:5000/api`.
 
 - Keep backend running while developing frontend features.
 - Login tokens are stored in browser `localStorage`.
+- Session, station, and operator names are now displayed using dynamic backend-enriched values.
+- User station AI analyze now shows corrected estimated cost and a concise key breakdown.
 
 ---
 
-Last updated: 2026-02-19
+Last updated: 2026-02-24

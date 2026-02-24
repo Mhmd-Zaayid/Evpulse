@@ -32,6 +32,3 @@ Frontend runs at: `http://localhost:5173`
 
 Press `Ctrl + C` in each terminal.
 
----
-
-Last updated: 2026-02-19

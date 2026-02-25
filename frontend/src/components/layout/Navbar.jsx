@@ -53,6 +53,23 @@ const Navbar = ({ onMenuClick }) => {
     window.location.href = '/';
   };
 
+  const getStationsPathByRole = (role) => {
+    if (role === 'admin') return '/admin/stations';
+    if (role === 'operator') return '/operator/stations';
+    return '/user/stations';
+  };
+
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
+      return;
+    }
+
+    const stationsPath = getStationsPathByRole(user?.role);
+    navigate(`${stationsPath}?city=${encodeURIComponent(trimmedQuery)}`);
+  };
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'success':
@@ -100,11 +117,14 @@ const Navbar = ({ onMenuClick }) => {
 
         {/* Search Bar - Center */}
         <div className="hidden md:flex items-center flex-1 max-w-xl mx-8">
-          <div className={`relative w-full transition-all duration-300 ${searchFocused ? 'scale-[1.02]' : ''}`}>
+          <form
+            onSubmit={handleSearchSubmit}
+            className={`relative w-full transition-all duration-300 ${searchFocused ? 'scale-[1.02]' : ''}`}
+          >
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${searchFocused ? 'text-primary-500' : 'text-secondary-400'}`} />
             <input
               type="text"
-              placeholder="Search stations, bookings, history..."
+              placeholder="Search charging stations by city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -119,7 +139,7 @@ const Navbar = ({ onMenuClick }) => {
               <Command className="w-3 h-3 text-secondary-500" />
               <span className="text-xs text-secondary-500 font-medium">K</span>
             </div>
-          </div>
+          </form>
         </div>
 
         {/* Right Section */}

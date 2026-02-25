@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth, useNotifications } from '../../context';
 import { stationsAPI, operatorAPI } from '../../services';
 import { formatCurrency, getStatusColor, getStatusText } from '../../utils';
@@ -18,6 +19,7 @@ import {
 const Stations = () => {
   const { user } = useAuth();
   const { showToast } = useNotifications();
+  const [searchParams] = useSearchParams();
   
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,14 @@ const Stations = () => {
     operatingHours: '',
     status: '',
   });
+
+  const normalizeSearchValue = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ');
+
+  const cityQuery = normalizeSearchValue(searchParams.get('city'));
 
   useEffect(() => {
     fetchStations();
@@ -211,6 +221,19 @@ const Stations = () => {
     );
   }
 
+  const filteredStations = cityQuery
+    ? stations.filter((station) => {
+        const stationCity = normalizeSearchValue(station?.city || station?.location?.city);
+        const stationAddress = normalizeSearchValue(station?.address);
+        const stationName = normalizeSearchValue(station?.name);
+        return (
+          stationCity.includes(cityQuery) ||
+          stationAddress.includes(cityQuery) ||
+          stationName.includes(cityQuery)
+        );
+      })
+    : stations;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -225,9 +248,9 @@ const Stations = () => {
       </div>
 
       {/* Stations Grid */}
-      {stations.length > 0 ? (
+      {filteredStations.length > 0 ? (
         <div className="space-y-6">
-          {stations.map((station) => (
+          {filteredStations.map((station) => (
             <div key={station.id} className="card">
               {/* Station Header */}
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-4 border-b border-secondary-100">
@@ -363,8 +386,8 @@ const Stations = () => {
       ) : (
         <EmptyState
           icon={Building2}
-          title="No stations yet"
-          description="Add your first charging station to get started"
+          title={cityQuery ? 'No stations found' : 'No stations yet'}
+          description={cityQuery ? 'No charging stations match that city search' : 'Add your first charging station to get started'}
           action={
             <Button icon={Plus} onClick={() => setShowAddModal(true)}>
               Add Station

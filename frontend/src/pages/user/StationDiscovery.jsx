@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { stationsAPI } from '../../services';
 import { useNotifications } from '../../context';
 import { formatDistance } from '../../utils';
@@ -18,6 +18,7 @@ import {
 
 const StationDiscovery = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showToast } = useNotifications();
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,14 +33,29 @@ const StationDiscovery = () => {
     sortBy: 'distance',
   });
 
+  const cityQueryFromUrl = (searchParams.get('city') || '').trim();
+  const normalizeSearchValue = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ');
+
   useEffect(() => {
     fetchStations();
-  }, [filters]);
+  }, [filters, cityQueryFromUrl]);
+
+  useEffect(() => {
+    setSearchQuery(cityQueryFromUrl);
+  }, [cityQueryFromUrl]);
 
   const fetchStations = async () => {
     setLoading(true);
     try {
-      const response = await stationsAPI.getAll(filters);
+      const apiFilters = cityQueryFromUrl
+        ? { ...filters, maxDistance: undefined }
+        : filters;
+
+      const response = await stationsAPI.getAll(apiFilters);
       if (response?.success) {
         const normalizedStations = (response.data || []).map((station) => ({
           ...station,
@@ -66,10 +82,19 @@ const StationDiscovery = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  const filteredStations = stations.filter(station => 
-    (station.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (station.address || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedSearchQuery = normalizeSearchValue(searchQuery);
+
+  const filteredStations = stations.filter((station) => {
+    const stationName = normalizeSearchValue(station.name);
+    const stationAddress = normalizeSearchValue(station.address);
+    const stationCity = normalizeSearchValue(station.city || station.location?.city);
+
+    return (
+      stationName.includes(normalizedSearchQuery) ||
+      stationAddress.includes(normalizedSearchQuery) ||
+      stationCity.includes(normalizedSearchQuery)
+    );
+  });
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },

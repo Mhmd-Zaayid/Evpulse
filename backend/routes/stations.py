@@ -4,6 +4,7 @@ from models.station import Station
 from bson import ObjectId
 from datetime import datetime
 import math
+import re
 
 from routes.common import role_required, to_object_id, now_utc
 
@@ -65,7 +66,7 @@ def get_all_stations():
         if status and status != 'all':
             query['status'] = status
         if city:
-            query['city'] = city
+            query['city'] = {'$regex': re.escape(city), '$options': 'i'}
         
         # Fetch from MongoDB database
         stations_data = list(db.stations.find(query))

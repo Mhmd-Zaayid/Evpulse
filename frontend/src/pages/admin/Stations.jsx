@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useNotifications } from '../../context';
 import { adminAPI } from '../../services';
 import { formatCurrency, formatDate } from '../../utils';
@@ -23,6 +24,12 @@ import {
 
 const Stations = () => {
   const { showToast } = useNotifications();
+  const [searchParams] = useSearchParams();
+  const normalizeSearchValue = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ');
   
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +48,12 @@ const Stations = () => {
     fetchStations();
   }, []);
 
+  useEffect(() => {
+    const cityQuery = searchParams.get('city') || '';
+    setSearchQuery(cityQuery);
+    setCurrentPage(1);
+  }, [searchParams]);
+
   const fetchStations = async () => {
     setLoading(true);
     try {
@@ -53,6 +66,7 @@ const Stations = () => {
             id: station.id,
             name: station.name || 'Unknown Station',
             address: station.address || 'N/A',
+            city: station.city || station.location?.city || '',
             operator: station.operatorName || station.operator || 'Unknown Operator',
             operatorId: station.operatorId || '',
             status: station.status || 'offline',
@@ -77,8 +91,10 @@ const Stations = () => {
   };
 
   const filteredStations = stations.filter(station => {
-    const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         station.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const normalizedSearchQuery = normalizeSearchValue(searchQuery);
+    const matchesSearch = normalizeSearchValue(station.name).includes(normalizedSearchQuery) ||
+                         normalizeSearchValue(station.address).includes(normalizedSearchQuery) ||
+                         normalizeSearchValue(station.city).includes(normalizedSearchQuery);
     const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
     const matchesOperator = operatorFilter === 'all' || station.operatorId === operatorFilter;
     return matchesSearch && matchesStatus && matchesOperator;

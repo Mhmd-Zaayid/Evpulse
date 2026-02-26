@@ -1,4 +1,4 @@
-# EVPulse Documentationssss
+# EVPulse Documentations
 
 Full-stack EV charging platform documentation for setup, architecture, API groups, and troubleshooting.
 

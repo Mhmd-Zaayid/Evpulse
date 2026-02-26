@@ -39,20 +39,22 @@ def get_operator_stats():
         # Get operator's stations
         stations = list(db.stations.find({'operator_id': user_id}))
         station_ids = [s['_id'] for s in stations]
+        station_ids_str = [str(station_id) for station_id in station_ids]
+        station_id_filter = {'$in': station_ids + station_ids_str}
         
         total_stations = len(stations)
         total_ports = sum(len(s.get('ports', [])) for s in stations)
         
         # Get active sessions
         active_sessions = db.sessions.count_documents({
-            'station_id': {'$in': station_ids},
+            'station_id': station_id_filter,
             'status': 'active'
         })
         
         # Today's stats
         today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
         today_sessions = list(db.sessions.find({
-            'station_id': {'$in': station_ids},
+            'station_id': station_id_filter,
             'start_time': {'$gte': today}
         }))
         
@@ -62,7 +64,7 @@ def get_operator_stats():
         # Monthly stats
         month_ago = now_utc() - timedelta(days=30)
         month_sessions = list(db.sessions.find({
-            'station_id': {'$in': station_ids},
+            'station_id': station_id_filter,
             'start_time': {'$gte': month_ago}
         }))
         
@@ -84,7 +86,7 @@ def get_operator_stats():
         
         # Average session duration
         completed_sessions = list(db.sessions.find({
-            'station_id': {'$in': station_ids},
+            'station_id': station_id_filter,
             'status': 'completed'
         }))
         avg_duration = sum(s.get('duration', 0) for s in completed_sessions) / max(len(completed_sessions), 1)
@@ -107,7 +109,10 @@ def get_operator_stats():
         # Revenue by station
         revenue_by_station = []
         for station in stations:
-            station_sessions = [s for s in month_sessions if s.get('station_id') == station['_id']]
+            station_sessions = [
+                s for s in month_sessions
+                if s.get('station_id') in (station['_id'], str(station['_id']))
+            ]
             station_revenue = sum(s.get('cost', 0) or 0 for s in station_sessions)
             revenue_by_station.append({
                 'station': station['name'],

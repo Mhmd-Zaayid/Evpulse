@@ -272,7 +272,13 @@ const StationDetail = () => {
     }
 
     try {
-      const response = await sessionsAPI.stopSession(activeSessionId);
+      const elapsedMinutes = Math.max(1, Math.round((chargingProgress / 100) * 30));
+      const response = await sessionsAPI.stopSession(activeSessionId, {
+        progress: chargingProgress,
+        durationMinutes: elapsedMinutes,
+        energyDelivered: deliveredKwh,
+        totalCost: currentCost,
+      });
       if (!response.success) {
         showToast({ type: 'error', message: response.error || 'Failed to stop session' });
         return;
@@ -347,7 +353,14 @@ const StationDetail = () => {
   }
 
   const availablePorts = station.ports.filter(p => p.status === 'available');
-  const selectedPortPrice = Number(selectedPort?.price || 0);
+  const selectedPortPrice = Number(
+    selectedPort?.price ??
+    (selectedPort?.type?.includes('DC')
+      ? station?.pricing?.fast?.base
+      : station?.pricing?.normal?.base) ??
+    station?.pricing?.perKwh ??
+    0
+  );
   const selectedPortPower = Number(selectedPort?.power || 0);
   const aiEffectivePort =
     selectedPort ||
@@ -361,8 +374,13 @@ const StationDetail = () => {
       station.pricing?.perKwh ??
       0
   );
-  const deliveredKwh = Number(((chargingProgress / 100) * (selectedPortPower > 0 ? selectedPortPower * 0.5 : 20)).toFixed(1));
-  const currentCost = Number((deliveredKwh * selectedPortPrice).toFixed(2));
+  const rawDeliveredKwh = (chargingProgress / 100) * (selectedPortPower > 0 ? selectedPortPower * 0.5 : 20);
+  const maxBillableKwh = selectedPortPrice > 0 ? (50 / selectedPortPrice) : 10;
+  const estimatedSessionKwh = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
+  const estimatedSessionCost = Number(Math.min(50, estimatedSessionKwh * Math.max(selectedPortPrice, 0)).toFixed(2));
+  const progressRatio = Math.min(1, Math.max(0, chargingProgress / 100));
+  const deliveredKwh = Number((estimatedSessionKwh * progressRatio).toFixed(1));
+  const currentCost = Number((estimatedSessionCost * progressRatio).toFixed(2));
   const minutesLeft = Math.max(0, Math.ceil((100 - chargingProgress) * 0.3));
   const aiEnergyRequired = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
   const aiChargingMinutes = slotEstimate?.estimatedChargingTime || Math.ceil((aiEnergyRequired / Math.max(selectedPortPower || 22, 1)) * 60);

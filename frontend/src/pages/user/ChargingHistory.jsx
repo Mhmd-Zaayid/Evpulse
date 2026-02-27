@@ -60,6 +60,8 @@ const ChargingHistory = () => {
       if (response.success) {
         const normalizedHistory = (response.data || []).map((session) => ({
           ...session,
+          energyConsumed: Number(session.energyDelivered ?? session.energyConsumed ?? 0),
+          cost: Number(session.cost ?? session.totalCost ?? 0),
           userName: session.userName || user?.name || 'Unknown User',
           operatorName: session.operatorName || 'Unknown Operator',
         }));

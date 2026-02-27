@@ -71,7 +71,7 @@ const Sessions = () => {
 
   const activeSessions = sessions.filter(s => s.status === 'active');
   const completedSessions = sessions.filter(s => s.status === 'completed');
-  const totalRevenue = completedSessions.reduce((sum, s) => sum + (s.cost || 0), 0);
+  const totalRevenue = completedSessions.reduce((sum, s) => sum + Number(s.cost ?? s.totalCost ?? 0), 0);
   const totalEnergy = completedSessions.reduce((sum, s) => sum + (s.energyDelivered || 0), 0);
 
   const columns = [
@@ -133,7 +133,7 @@ const Sessions = () => {
       label: 'Cost',
       render: (_, row) => (
         <span className="font-semibold text-secondary-900">
-          {row.cost ? formatCurrency(row.cost) : '—'}
+          {Number(row.cost ?? row.totalCost ?? 0) > 0 ? formatCurrency(Number(row.cost ?? row.totalCost ?? 0)) : '—'}
         </span>
       ),
     },
@@ -247,8 +247,8 @@ const Sessions = () => {
                     <p className="font-medium">{formatEnergy(session.energyDelivered)}</p>
                   </div>
                   <div>
-                    <p className="text-secondary-500">Est. Cost</p>
-                    <p className="font-medium">{formatCurrency(session.energyDelivered * 0.35)}</p>
+                    <p className="text-secondary-500">Current Estimate</p>
+                    <p className="font-medium">{formatCurrency(Number(session.cost ?? session.totalCost ?? (session.energyDelivered * 0.35)))}</p>
                   </div>
                 </div>
               </div>

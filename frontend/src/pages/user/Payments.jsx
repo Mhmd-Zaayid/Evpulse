@@ -43,7 +43,11 @@ const Payments = () => {
         transactionsAPI.getByUser(),
         transactionsAPI.getWalletBalance(user?.id),
       ]);
-      setTransactions(transRes?.data || []);
+      const normalizedTransactions = (transRes?.data || []).map((txn) => ({
+        ...txn,
+        amount: Number(txn.amount ?? 0),
+      }));
+      setTransactions(normalizedTransactions);
       setWalletBalance(walletRes?.data?.balance || 0);
     } catch (error) {
       console.error('Failed to fetch payment data:', error);

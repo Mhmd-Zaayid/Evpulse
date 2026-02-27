@@ -14,6 +14,51 @@ admin_bp = Blueprint('admin', __name__)
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
 
 
+def _to_amount(value):
+    try:
+        if value is None:
+            return 0.0
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _resolve_charging_amounts_for_admin(db, transactions_data):
+    charging_session_ids = []
+    for txn in transactions_data:
+        if txn.get('type') == 'charging' and _to_amount(txn.get('amount')) <= 0 and txn.get('session_id'):
+            charging_session_ids.append(txn.get('session_id'))
+
+    if not charging_session_ids:
+        return transactions_data
+
+    sessions = list(db.sessions.find(
+        {'_id': {'$in': charging_session_ids}},
+        {'cost': 1, 'total_cost': 1}
+    ))
+    session_cost_map = {
+        s['_id']: _to_amount(s.get('cost') or s.get('total_cost'))
+        for s in sessions
+    }
+
+    for txn in transactions_data:
+        if txn.get('type') != 'charging':
+            continue
+        if _to_amount(txn.get('amount')) > 0:
+            continue
+        session_id = txn.get('session_id')
+        resolved_amount = session_cost_map.get(session_id, 0.0)
+        if resolved_amount > 0:
+            txn['amount'] = resolved_amount
+            if txn.get('_id'):
+                db.transactions.update_one(
+                    {'_id': txn['_id']},
+                    {'$set': {'amount': resolved_amount, 'updated_at': now_utc()}}
+                )
+
+    return transactions_data
+
+
 def _build_user_name_map(db, user_ids):
     valid_ids = []
     for user_id in user_ids:
@@ -255,6 +300,7 @@ def get_all_transactions():
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
         transactions_data = list(db.transactions.find({}).sort('timestamp', -1))
+        transactions_data = _resolve_charging_amounts_for_admin(db, transactions_data)
         transactions = [Transaction.from_dict(data).to_response_dict() for data in transactions_data]
         user_name_map = _build_user_name_map(db, [txn.get('userId') for txn in transactions])
 

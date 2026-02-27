@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, g
 from models.session import Session
 from models.notification import Notification
 from datetime import datetime, timedelta
+import math
 from models.transaction import Transaction
 
 from routes.common import role_required, to_object_id, now_utc
@@ -72,6 +73,15 @@ def _enrich_sessions(db, sessions):
         })
 
     return enriched
+
+
+def _to_number(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 @sessions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
@@ -204,6 +214,7 @@ def stop_session(session_id):
             return jsonify({'success': False, 'error': 'Invalid session id'}), 400
 
         session_data = db.sessions.find_one({'_id': session_oid})
+        payload = request.get_json(silent=True) or {}
         
         if not session_data:
             return jsonify({'success': False, 'error': 'Session not found'}), 404
@@ -224,12 +235,39 @@ def stop_session(session_id):
         start_time = session_data['start_time']
         end_time = now_utc()
         duration_seconds = (end_time - start_time).total_seconds()
-        duration_minutes = int(duration_seconds / 60)
-        
-        # Calculate cost (simplified pricing)
-        energy_rate = 0.35 if 'fast' in session_data.get('charging_type', '').lower() else 0.25
-        energy_delivered = round(duration_minutes * 0.8, 1)  # Approximate kWh
-        total_cost = round(energy_delivered * energy_rate, 2)
+        duration_minutes = max(1, math.ceil(duration_seconds / 60))
+
+        requested_duration = _to_number(payload.get('durationMinutes'))
+        if requested_duration is not None and requested_duration > 0:
+            duration_minutes = max(1, int(round(requested_duration)))
+
+        # Resolve active port metadata for realistic billing
+        selected_port = None
+        for port in (station or {}).get('ports', []):
+            if str(port.get('id')) == str(session_data.get('port_id')):
+                selected_port = port
+                break
+
+        energy_rate = float((selected_port or {}).get('price') or 8.0)
+        charger_power_kw = float((selected_port or {}).get('power') or 22.0)
+        charger_power_kw = max(3.0, charger_power_kw)
+
+        # Prefer client telemetry when provided; otherwise estimate conservatively
+        requested_energy = _to_number(payload.get('energyDelivered'))
+        if requested_energy is not None and requested_energy > 0:
+            energy_delivered = round(float(requested_energy), 1)
+        else:
+            estimated_energy = (duration_minutes / 60.0) * charger_power_kw * 0.15
+            energy_delivered = round(max(0.1, estimated_energy), 1)
+
+        requested_cost = _to_number(payload.get('totalCost'))
+        if requested_cost is not None and requested_cost > 0:
+            total_cost = float(requested_cost)
+        else:
+            total_cost = energy_delivered * energy_rate
+
+        # Product constraint: cap charging session billing at ₹50
+        total_cost = round(min(50.0, max(1.0, total_cost)), 2)
         
         # Update session
         db.sessions.update_one(
@@ -252,24 +290,48 @@ def stop_session(session_id):
             {'$set': {'ports.$.status': 'available'}}
         )
         
-        transaction = Transaction(
-            user_id=session_data['user_id'],
-            amount=total_cost,
-            transaction_type='charging',
-            payment_method=session_data.get('payment_method', 'Wallet'),
-            description=f"Charging session at station",
-            session_id=session_oid
-        )
-        transaction.created_at = now_utc()
-        transaction.timestamp = now_utc()
-        db.transactions.insert_one(transaction.to_dict())
+        transaction_payload = {
+            'user_id': session_data['user_id'],
+            'session_id': session_oid,
+            'amount': total_cost,
+            'type': 'charging',
+            'payment_method': session_data.get('payment_method', 'Wallet'),
+            'status': 'completed',
+            'description': 'Charging session at station',
+            'timestamp': now_utc(),
+            'updated_at': now_utc(),
+        }
+        existing_transaction = db.transactions.find_one({
+            'session_id': session_oid,
+            'type': 'charging'
+        })
+        if existing_transaction:
+            db.transactions.update_one(
+                {'_id': existing_transaction['_id']},
+                {
+                    '$set': transaction_payload,
+                    '$setOnInsert': {'created_at': now_utc()}
+                }
+            )
+        else:
+            transaction = Transaction(
+                user_id=session_data['user_id'],
+                amount=total_cost,
+                transaction_type='charging',
+                payment_method=session_data.get('payment_method', 'Wallet'),
+                description='Charging session at station',
+                session_id=session_oid
+            )
+            transaction.created_at = now_utc()
+            transaction.timestamp = now_utc()
+            db.transactions.insert_one(transaction.to_dict())
         
         # Create notification
         notification = Notification(
             user_id=str(session_data['user_id']),
             notification_type='charging_complete',
             title='Charging Complete',
-            message=f'Your vehicle has finished charging. Total: ${total_cost}',
+            message=f'Your vehicle has finished charging. Total: ₹{total_cost}',
             action_url='/user/history'
         )
         db.notifications.insert_one(notification.to_dict())

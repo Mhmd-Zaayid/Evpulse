@@ -5,6 +5,51 @@ from routes.common import role_required, to_object_id, now_utc
 
 transactions_bp = Blueprint('transactions', __name__)
 
+
+def _to_amount(value):
+    try:
+        if value is None:
+            return 0.0
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _resolve_charging_amounts(db, transactions_data, persist=False):
+    charging_session_ids = []
+    for txn in transactions_data:
+        if txn.get('type') == 'charging' and _to_amount(txn.get('amount')) <= 0 and txn.get('session_id'):
+            charging_session_ids.append(txn.get('session_id'))
+
+    if not charging_session_ids:
+        return transactions_data
+
+    session_cost_map = {}
+    sessions = db.sessions.find(
+        {'_id': {'$in': charging_session_ids}},
+        {'cost': 1, 'total_cost': 1}
+    )
+    for session in sessions:
+        session_cost_map[session['_id']] = _to_amount(session.get('cost') or session.get('total_cost'))
+
+    for txn in transactions_data:
+        if txn.get('type') != 'charging':
+            continue
+        if _to_amount(txn.get('amount')) > 0:
+            continue
+
+        session_id = txn.get('session_id')
+        resolved_amount = session_cost_map.get(session_id, 0.0)
+        if resolved_amount > 0:
+            txn['amount'] = resolved_amount
+            if persist and txn.get('_id'):
+                db.transactions.update_one(
+                    {'_id': txn['_id']},
+                    {'$set': {'amount': resolved_amount, 'updated_at': now_utc()}}
+                )
+
+    return transactions_data
+
 @transactions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
 def get_transactions():
@@ -23,6 +68,7 @@ def get_transactions():
             query['session_id'] = {'$in': session_ids}
 
         transactions_data = list(db.transactions.find(query).sort('timestamp', -1))
+        transactions_data = _resolve_charging_amounts(db, transactions_data, persist=True)
         transactions = [Transaction.from_dict(data).to_response_dict() for data in transactions_data]
         
         return jsonify({'success': True, 'data': transactions})
@@ -105,9 +151,10 @@ def get_wallet_balance(user_id):
             'type': 'charging',
             'status': 'completed'
         }))
+        wallet_payments = _resolve_charging_amounts(db, wallet_payments, persist=True)
         
-        total_topup = sum(t.get('amount', 0) for t in topups)
-        total_spent = sum(t.get('amount', 0) for t in wallet_payments)
+        total_topup = sum(_to_amount(t.get('amount', 0)) for t in topups)
+        total_spent = sum(_to_amount(t.get('amount', 0)) for t in wallet_payments)
         
         balance = round(total_topup - total_spent, 2)
         
@@ -154,9 +201,10 @@ def topup_wallet():
             'type': 'charging',
             'status': 'completed'
         }))
+        wallet_payments = _resolve_charging_amounts(db, wallet_payments, persist=True)
         
-        total_topup = sum(t.get('amount', 0) for t in topups)
-        total_spent = sum(t.get('amount', 0) for t in wallet_payments)
+        total_topup = sum(_to_amount(t.get('amount', 0)) for t in topups)
+        total_spent = sum(_to_amount(t.get('amount', 0)) for t in wallet_payments)
         new_balance = round(total_topup - total_spent, 2)
         
         return jsonify({
@@ -184,16 +232,17 @@ def get_transaction_summary(user_id):
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
         transactions = list(db.transactions.find({'user_id': target_user_id}))
+        transactions = _resolve_charging_amounts(db, transactions, persist=True)
         
-        charging_total = sum(t.get('amount', 0) for t in transactions if t.get('type') == 'charging')
-        topup_total = sum(t.get('amount', 0) for t in transactions if t.get('type') == 'wallet_topup')
+        charging_total = sum(_to_amount(t.get('amount', 0)) for t in transactions if t.get('type') == 'charging')
+        topup_total = sum(_to_amount(t.get('amount', 0)) for t in transactions if t.get('type') == 'wallet_topup')
         
         # Group by month
         monthly = {}
         for t in transactions:
             if t.get('type') == 'charging' and t.get('timestamp'):
                 month_key = t['timestamp'].strftime('%Y-%m')
-                monthly[month_key] = monthly.get(month_key, 0) + t.get('amount', 0)
+                monthly[month_key] = monthly.get(month_key, 0) + _to_amount(t.get('amount', 0))
         
         return jsonify({
             'success': True,

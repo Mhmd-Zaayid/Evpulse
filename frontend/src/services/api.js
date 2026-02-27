@@ -182,9 +182,12 @@ export const sessionsAPI = {
     }
   },
 
-  async stopSession(sessionId) {
+  async stopSession(sessionId, payload = null) {
     try {
-      return await apiRequest(`/sessions/stop/${sessionId}`, { method: 'POST' });
+      return await apiRequest(`/sessions/stop/${sessionId}`, {
+        method: 'POST',
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
     } catch (error) {
       return safeError(error);
     }

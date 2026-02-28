@@ -138,6 +138,25 @@ def _get_wallet_balance(db, user_id):
     total_spent = sum(_resolve_transaction_amount(db, txn) for txn in wallet_payments)
     return round(max(0.0, total_topup - total_spent), 2)
 
+
+def _create_notification(db, user_id, notification_type, title, message, action_url=None):
+    if not user_id:
+        return
+    notification = Notification(
+        user_id=str(user_id),
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        action_url=action_url
+    )
+    db.notifications.insert_one(notification.to_dict())
+
+
+def _notify_admins(db, notification_type, title, message, action_url=None):
+    admin_users = list(db.users.find({'role': 'admin'}, {'_id': 1}))
+    for admin in admin_users:
+        _create_notification(db, admin.get('_id'), notification_type, title, message, action_url)
+
 @sessions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
 def get_sessions():
@@ -269,6 +288,22 @@ def start_session():
                 'error': 'You already have an active charging session.'
             }), 400
         session.id = str(result.inserted_id)
+
+        _create_notification(
+            db,
+            station.get('operator_id'),
+            'session_update',
+            'Charging Session Started',
+            f'A charging session started at {station.get("name")}.',
+            '/operator/sessions'
+        )
+        _notify_admins(
+            db,
+            'session_update',
+            'Charging Session Started',
+            f'A charging session started at {station.get("name")}.',
+            '/admin/transactions'
+        )
         
         return jsonify({
             'success': True,
@@ -402,15 +437,30 @@ def stop_session(session_id):
             transaction.timestamp = now_utc()
             db.transactions.insert_one(transaction.to_dict())
         
-        # Create notification
-        notification = Notification(
-            user_id=str(session_data['user_id']),
-            notification_type='charging_complete',
-            title='Charging Complete',
-            message=f'Your vehicle has finished charging. Total: ₹{total_cost}',
-            action_url='/user/history'
+        # Create notifications for user, operator and admins
+        _create_notification(
+            db,
+            session_data.get('user_id'),
+            'charging_complete',
+            'Charging Complete',
+            f'Your vehicle has finished charging. Total: ₹{total_cost}',
+            '/user/history'
         )
-        db.notifications.insert_one(notification.to_dict())
+        _create_notification(
+            db,
+            (station or {}).get('operator_id'),
+            'session_update',
+            'Charging Session Completed',
+            f'A charging session at {(station or {}).get("name") or "station"} completed. Total: ₹{total_cost}',
+            '/operator/sessions'
+        )
+        _notify_admins(
+            db,
+            'session_update',
+            'Charging Session Completed',
+            f'Charging session completed at {(station or {}).get("name") or "station"}. Total: ₹{total_cost}',
+            '/admin/transactions'
+        )
         
         # Get updated session
         updated_session = db.sessions.find_one({'_id': session_oid})

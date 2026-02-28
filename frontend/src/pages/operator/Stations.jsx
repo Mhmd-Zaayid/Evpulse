@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth, useNotifications } from '../../context';
 import { stationsAPI, operatorAPI } from '../../services';
-import { formatCurrency, getStatusColor, getStatusText } from '../../utils';
+import { formatCurrency, getStatusColor, getStatusText, formatStationAddress, resolveStationImageSrc } from '../../utils';
 import { Button, Badge, Modal, Input, Select, Table, EmptyState, LoadingSpinner } from '../../components';
 import {
   Building2,
@@ -53,6 +53,7 @@ const Stations = () => {
     name: '',
     address: '',
     operatingHours: '',
+    image: '',
     status: '',
   });
 
@@ -107,7 +108,7 @@ const Stations = () => {
 
   const handleCreateStation = async () => {
     if (!addData.name.trim() || !addData.address.trim() || !addData.city.trim()) {
-      showToast({ type: 'error', message: 'Name, address, and city are required' });
+      showToast({ type: 'error', message: 'Name, city, and nearby location are required' });
       return;
     }
 
@@ -128,6 +129,7 @@ const Stations = () => {
       const payload = {
         name: addData.name.trim(),
         address: addData.address.trim(),
+        nearbyLandmark: addData.address.trim(),
         city: addData.city.trim(),
         coordinates: {},
         operatingHours: addData.operatingHours?.trim() || '24/7',
@@ -158,32 +160,91 @@ const Stations = () => {
     }
   };
 
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      showToast({ type: 'error', message: 'Please select a valid image file' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAddData((prev) => ({ ...prev, image: String(reader.result || '') }));
+    };
+    reader.onerror = () => {
+      showToast({ type: 'error', message: 'Failed to read selected image' });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleEditStation = (station) => {
     setSelectedStation(station);
     setEditData({
       name: station?.name || '',
-      address: station?.address || '',
+      address: station?.nearbyLandmark || station?.nearby_landmark || station?.address || '',
       operatingHours: station?.operatingHours || '',
+      image: station?.image || '',
       status: station?.status || 'available',
     });
     setShowEditModal(true);
   };
 
+  const handleEditImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      showToast({ type: 'error', message: 'Please select a valid image file' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditData((prev) => ({ ...prev, image: String(reader.result || '') }));
+    };
+    reader.onerror = () => {
+      showToast({ type: 'error', message: 'Failed to read selected image' });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveStation = async () => {
+    if (!selectedStation?.id) {
+      showToast({ type: 'error', message: 'Invalid station selection' });
+      return;
+    }
+
     try {
-      // Update local state
-      setStations(prev => prev.map(s => 
-        s.id === selectedStation.id 
-          ? { ...s, ...editData }
-          : s
-      ));
+      const payload = {
+        name: editData.name?.trim(),
+        address: editData.address?.trim(),
+        nearbyLandmark: editData.address?.trim(),
+        operating_hours: editData.operatingHours?.trim() || '24/7',
+        status: editData.status,
+        image: editData.image?.trim() || null,
+      };
+
+      const response = await stationsAPI.update(selectedStation.id, payload);
+      if (!response?.success) {
+        showToast({ type: 'error', message: response?.error || 'Failed to update station' });
+        return;
+      }
+
       showToast({ type: 'success', message: 'Station updated successfully!' });
+      await fetchStations();
       setShowEditModal(false);
       setSelectedStation(null);
       setEditData({
         name: '',
         address: '',
         operatingHours: '',
+        image: '',
         status: '',
       });
     } catch (error) {
@@ -224,13 +285,7 @@ const Stations = () => {
   const filteredStations = cityQuery
     ? stations.filter((station) => {
         const stationCity = normalizeSearchValue(station?.city || station?.location?.city);
-        const stationAddress = normalizeSearchValue(station?.address);
-        const stationName = normalizeSearchValue(station?.name);
-        return (
-          stationCity.includes(cityQuery) ||
-          stationAddress.includes(cityQuery) ||
-          stationName.includes(cityQuery)
-        );
+        return stationCity.includes(cityQuery);
       })
     : stations;
 
@@ -257,11 +312,11 @@ const Stations = () => {
                 <div className="flex items-start gap-4">
                   <div className="w-20 h-20 rounded-xl overflow-hidden bg-secondary-100 flex-shrink-0">
                     <img
-                      src={station.image}
+                      src={resolveStationImageSrc(station)}
                       alt={station.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-center"
                       onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/80?text=EV';
+                        e.target.src = resolveStationImageSrc({});
                       }}
                     />
                   </div>
@@ -274,7 +329,7 @@ const Stations = () => {
                     </div>
                     <div className="flex items-center gap-2 text-secondary-500 text-sm">
                       <MapPin className="w-4 h-4" />
-                      <span>{station.address}</span>
+                      <span>{formatStationAddress(station)}</span>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm">
                       <span className="text-secondary-600">
@@ -422,10 +477,10 @@ const Stations = () => {
             />
           </div>
           <Input
-            label="Address"
+            label="Nearby Location"
             value={addData.address}
             onChange={(e) => setAddData(prev => ({ ...prev, address: e.target.value }))}
-            placeholder="Enter full address"
+            placeholder="Enter nearby landmark"
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -439,6 +494,15 @@ const Stations = () => {
               value={addData.image}
               onChange={(e) => setAddData(prev => ({ ...prev, image: e.target.value }))}
               placeholder="https://..."
+            />
+          </div>
+          <div>
+            <label className="input-label">Upload Station Image (optional)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="input"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -570,6 +634,7 @@ const Stations = () => {
             name: '',
             address: '',
             operatingHours: '',
+            image: '',
             status: '',
           });
         }}
@@ -593,6 +658,21 @@ const Stations = () => {
             onChange={(e) => setEditData(prev => ({ ...prev, operatingHours: e.target.value }))}
             placeholder="e.g., 24/7 or 6:00 AM - 11:00 PM"
           />
+          <Input
+            label="Image URL"
+            value={editData.image}
+            onChange={(e) => setEditData(prev => ({ ...prev, image: e.target.value }))}
+            placeholder="https://..."
+          />
+          <div>
+            <label className="input-label">Upload Station Image (optional)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleEditImageUpload}
+              className="input"
+            />
+          </div>
           <Select
             label="Status"
             value={editData.status}

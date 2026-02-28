@@ -57,6 +57,19 @@ def _resolve_charging_amounts(db, transactions_data, persist=False):
 
     return transactions_data
 
+
+def _notify_admins(db, notification_type, title, message, action_url=None):
+    admin_users = list(db.users.find({'role': 'admin'}, {'_id': 1}))
+    for admin in admin_users:
+        notification = Notification(
+            user_id=str(admin.get('_id')),
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            action_url=action_url
+        )
+        db.notifications.insert_one(notification.to_dict())
+
 @transactions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
 def get_transactions():
@@ -133,6 +146,13 @@ def process_payment():
             action_url='/user/payments'
         )
         db.notifications.insert_one(payment_notification.to_dict())
+        _notify_admins(
+            db,
+            'payment_success',
+            'Payment Received',
+            f'Payment of ₹{payment_amount:.2f} via {payment_method} was processed.',
+            '/admin/transactions'
+        )
         
         return jsonify({
             'success': True,
@@ -216,6 +236,13 @@ def topup_wallet():
             action_url='/user/payments'
         )
         db.notifications.insert_one(topup_notification.to_dict())
+        _notify_admins(
+            db,
+            'payment_success',
+            'Wallet Top-up Received',
+            f'Wallet top-up of ₹{payment_amount:.2f} via {payment_method} was processed.',
+            '/admin/transactions'
+        )
         
         # Get new balance
         topups = list(db.transactions.find({

@@ -91,6 +91,61 @@ export const formatDistance = (km) => {
   return `${km.toFixed(1)} km`;
 };
 
+export const formatStationAddress = (station) => {
+  const city = String(station?.city || station?.location?.city || '').trim();
+  const nearby = String(station?.nearbyLandmark || station?.nearby_landmark || station?.address || '').trim();
+  const escapedCity = city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  if (city && nearby) {
+    const cityPrefixPattern = new RegExp(`^\\s*${escapedCity}\\s*[-,]`, 'i');
+    if (cityPrefixPattern.test(nearby) || nearby.toLowerCase() === city.toLowerCase()) {
+      return nearby;
+    }
+    return `${city} - ${nearby}`;
+  }
+
+  return city || nearby || 'Address not available';
+};
+
+const STATION_IMAGE_PLACEHOLDER = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" fill="none">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#e5e7eb"/>
+        <stop offset="100%" stop-color="#cbd5e1"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="600" fill="url(#bg)"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#475569" font-family="Arial, sans-serif" font-size="52" font-weight="700">EV Station</text>
+  </svg>`
+)}`;
+
+export const resolveStationImageSrc = (station) => {
+  const rawImage = String(station?.image || '').trim();
+  const normalizedImage = /^(null|none|undefined)$/i.test(rawImage) ? '' : rawImage;
+
+  if (!normalizedImage) {
+    return STATION_IMAGE_PLACEHOLDER;
+  }
+
+  if (normalizedImage.startsWith('data:image/')) {
+    return normalizedImage;
+  }
+
+  const isHttp = normalizedImage.startsWith('http://') || normalizedImage.startsWith('https://');
+  if (!isHttp) {
+    return STATION_IMAGE_PLACEHOLDER;
+  }
+
+  const updatedAt = station?.updatedAt || station?.updated_at;
+  if (!updatedAt) {
+    return normalizedImage;
+  }
+
+  const separator = normalizedImage.includes('?') ? '&' : '?';
+  return `${normalizedImage}${separator}v=${encodeURIComponent(String(updatedAt))}`;
+};
+
 // Calculate charging time estimate
 export const calculateChargingTime = (energyNeeded, power) => {
   const hours = energyNeeded / power;

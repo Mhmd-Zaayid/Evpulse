@@ -107,6 +107,25 @@ def _refresh_elapsed_bookings(db, station_id=None, date=None, port_id=None):
             {'$set': {'status': 'completed', 'updated_at': now_utc()}}
         )
 
+
+def _create_notification(db, user_id, notification_type, title, message, action_url=None):
+    if not user_id:
+        return
+    notification = Notification(
+        user_id=str(user_id),
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        action_url=action_url
+    )
+    db.notifications.insert_one(notification.to_dict())
+
+
+def _notify_admins(db, notification_type, title, message, action_url=None):
+    admin_users = list(db.users.find({'role': 'admin'}, {'_id': 1}))
+    for admin in admin_users:
+        _create_notification(db, admin.get('_id'), notification_type, title, message, action_url)
+
 def _serialize_bookings(bookings_data, db):
     bookings = []
     for data in bookings_data:
@@ -231,15 +250,31 @@ def create_booking():
 
         booking.id = str(result.inserted_id)
         
-        # Create notification
-        notification = Notification(
-            user_id=str(user_id),
-            notification_type='booking_confirmed',
-            title='Booking Confirmed',
-            message=f'You have booked {_humanize_slot_label(data["timeSlot"])} slot at {station["name"]} on {data["date"]}.',
-            action_url='/user/bookings'
+        # Create notifications for user, operator and admins
+        slot_label = _humanize_slot_label(data['timeSlot'])
+        _create_notification(
+            db,
+            user_id,
+            'booking_confirmed',
+            'Booking Confirmed',
+            f'You have booked {slot_label} slot at {station["name"]} on {data["date"]}.',
+            '/user/bookings'
         )
-        db.notifications.insert_one(notification.to_dict())
+        _create_notification(
+            db,
+            station.get('operator_id'),
+            'booking_confirmed',
+            'New Booking Received',
+            f'New booking for {slot_label} at {station["name"]} on {data["date"]}.',
+            '/operator/stations'
+        )
+        _notify_admins(
+            db,
+            'booking_confirmed',
+            'New Booking Recorded',
+            f'Booking created for {station["name"]} on {data["date"]} ({slot_label}).',
+            '/admin/bookings'
+        )
         
         booking_dict = booking.to_response_dict()
         booking_dict['stationName'] = station['name'] if station else 'Unknown Station'
@@ -278,6 +313,34 @@ def cancel_booking(booking_id):
         db.bookings.update_one(
             {'_id': booking_oid},
             {'$set': {'status': 'cancelled', 'updated_at': now_utc()}}
+        )
+
+        station = db.stations.find_one({'_id': booking_data.get('station_id')}, {'name': 1, 'operator_id': 1})
+        station_name = (station or {}).get('name') or 'Unknown Station'
+        slot_label = _humanize_slot_label(booking_data.get('time_slot'))
+
+        _create_notification(
+            db,
+            booking_data.get('user_id'),
+            'reminder',
+            'Booking Cancelled',
+            f'Your booking for {slot_label} at {station_name} on {booking_data.get("date")} was cancelled.',
+            '/user/bookings'
+        )
+        _create_notification(
+            db,
+            (station or {}).get('operator_id'),
+            'reminder',
+            'Booking Cancelled',
+            f'A booking for {slot_label} at {station_name} on {booking_data.get("date")} was cancelled.',
+            '/operator/stations'
+        )
+        _notify_admins(
+            db,
+            'reminder',
+            'Booking Cancelled',
+            f'Booking cancelled for {station_name} on {booking_data.get("date")} ({slot_label}).',
+            '/admin/bookings'
         )
         
         return jsonify({'success': True, 'message': 'Booking cancelled successfully'})

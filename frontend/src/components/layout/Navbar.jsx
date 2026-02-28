@@ -72,11 +72,22 @@ const Navbar = ({ onMenuClick }) => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case 'booking_confirmed':
+      case 'payment_success':
       case 'success':
         return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'charging_complete':
+      case 'station_update':
+      case 'session_update':
+      case 'info':
+        return <Info className="w-5 h-5 text-blue-500" />;
       case 'warning':
+      case 'maintenance_alert':
+      case 'reminder':
         return <AlertTriangle className="w-5 h-5 text-amber-500" />;
       case 'error':
+      case 'admin_action':
+      case 'refund_processed':
         return <X className="w-5 h-5 text-red-500" />;
       default:
         return <Info className="w-5 h-5 text-blue-500" />;
@@ -196,9 +207,9 @@ const Navbar = ({ onMenuClick }) => {
                         }`}
                       >
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          notification.type === 'success' ? 'bg-green-100' :
-                          notification.type === 'warning' ? 'bg-amber-100' :
-                          notification.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                          ['success', 'booking_confirmed', 'payment_success'].includes(notification.type) ? 'bg-green-100' :
+                          ['warning', 'maintenance_alert', 'reminder'].includes(notification.type) ? 'bg-amber-100' :
+                          ['error', 'admin_action', 'refund_processed'].includes(notification.type) ? 'bg-red-100' : 'bg-blue-100'
                         }`}>
                           {getNotificationIcon(notification.type)}
                         </div>

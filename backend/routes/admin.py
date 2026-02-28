@@ -23,6 +23,40 @@ def _to_amount(value):
         return 0.0
 
 
+def _to_float(value):
+    try:
+        if value is None:
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace('Z', '+00:00')).replace(tzinfo=None)
+        except ValueError:
+            return None
+    return None
+
+
+def _in_range(value, start, end):
+    parsed = _to_datetime(value)
+    return bool(parsed and start <= parsed < end)
+
+
+def _id_to_string(value):
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
+
+
 def _resolve_charging_amounts_for_admin(db, transactions_data):
     charging_session_ids = []
     for txn in transactions_data:
@@ -143,11 +177,15 @@ def get_admin_stats():
         
         # Calculate revenue
         transactions = list(db.transactions.find({'type': 'charging', 'status': 'completed'}))
-        total_revenue = sum(t.get('amount', 0) for t in transactions)
+        transactions = _resolve_charging_amounts_for_admin(db, transactions)
+        total_revenue = round(sum(_to_amount(t.get('amount')) for t in transactions), 2)
         
         # Calculate total energy
         sessions = list(db.sessions.find({'status': 'completed'}))
-        total_energy = sum(s.get('energy_delivered', 0) for s in sessions)
+        total_energy = round(
+            sum(_to_float(s.get('energy_delivered', s.get('energyDelivered', 0))) for s in sessions),
+            1
+        )
         
         # Monthly growth calculations (simplified)
         month_ago = datetime.utcnow() - timedelta(days=30)
@@ -161,6 +199,8 @@ def get_admin_stats():
         })
         user_growth = ((recent_users - prev_users) / max(prev_users, 1)) * 100
         
+        users_data = list(db.users.find({'role': 'user'}, {'created_at': 1}))
+
         # Revenue, energy and users by month (last 6 months, calendar-aligned)
         revenue_by_month = []
         current_month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -168,38 +208,91 @@ def get_admin_stats():
             start = _shift_month_start(current_month_start, -i)
             end = _shift_month_start(start, 1)
 
-            month_trans = db.transactions.find({
-                'timestamp': {'$gte': start, '$lt': end},
-                'type': 'charging',
-                'status': 'completed'
-            })
-            month_revenue = sum(_to_amount(t.get('amount', 0)) for t in month_trans)
+            month_trans = [
+                t for t in transactions
+                if _in_range(t.get('timestamp') or t.get('created_at') or t.get('updated_at'), start, end)
+            ]
+            month_revenue = round(sum(_to_amount(t.get('amount', 0)) for t in month_trans), 2)
 
-            month_sessions = db.sessions.find({
-                'status': 'completed',
-                'end_time': {'$gte': start, '$lt': end}
-            })
-            month_energy = sum(float(s.get('energy_delivered', 0) or 0) for s in month_sessions)
+            month_sessions = [
+                s for s in sessions
+                if _in_range(
+                    s.get('end_time') or s.get('updated_at') or s.get('start_time') or s.get('created_at'),
+                    start,
+                    end
+                )
+            ]
+            month_energy = round(
+                sum(_to_float(s.get('energy_delivered', s.get('energyDelivered', 0))) for s in month_sessions),
+                1
+            )
 
-            month_users = db.users.count_documents({
-                'role': 'user',
-                'created_at': {'$gte': start, '$lt': end}
-            })
+            month_users = sum(1 for u in users_data if _in_range(u.get('created_at'), start, end))
 
             revenue_by_month.append({
                 'month': start.strftime('%b'),
-                'revenue': round(month_revenue, 2),
-                'energy': round(month_energy, 1),
+                'revenue': month_revenue,
+                'energy': month_energy,
                 'users': int(month_users),
             })
         
         # Stations by city
-        stations_by_city = list(db.stations.aggregate([
+        stations_by_city_raw = list(db.stations.aggregate([
             {'$group': {'_id': '$city', 'count': {'$sum': 1}}},
             {'$sort': {'count': -1}},
             {'$limit': 6}
         ]))
-        stations_by_city = [{'city': s['_id'], 'count': s['count']} for s in stations_by_city]
+
+        station_city_map = {
+            str(s['_id']): (s.get('city') or 'Unknown')
+            for s in db.stations.find({}, {'city': 1})
+        }
+        session_station_map = {
+            str(s['_id']): _id_to_string(s.get('station_id'))
+            for s in db.sessions.find({}, {'station_id': 1})
+        }
+
+        now = datetime.utcnow()
+        current_period_start = now - timedelta(days=30)
+        previous_period_start = now - timedelta(days=60)
+
+        city_revenue_current = {}
+        city_revenue_previous = {}
+
+        for txn in transactions:
+            session_id = _id_to_string(txn.get('session_id'))
+            station_id = session_station_map.get(session_id)
+            city = station_city_map.get(station_id, 'Unknown')
+            amount = _to_amount(txn.get('amount'))
+            txn_dt = _to_datetime(txn.get('timestamp') or txn.get('created_at') or txn.get('updated_at'))
+
+            if not txn_dt:
+                continue
+
+            if current_period_start <= txn_dt <= now:
+                city_revenue_current[city] = city_revenue_current.get(city, 0.0) + amount
+            elif previous_period_start <= txn_dt < current_period_start:
+                city_revenue_previous[city] = city_revenue_previous.get(city, 0.0) + amount
+
+        stations_by_city = []
+        for item in stations_by_city_raw:
+            city_name = item.get('_id') or 'Unknown'
+            current_revenue = round(city_revenue_current.get(city_name, 0.0), 2)
+            previous_revenue = round(city_revenue_previous.get(city_name, 0.0), 2)
+
+            if previous_revenue > 0:
+                growth = round(((current_revenue - previous_revenue) / previous_revenue) * 100, 1)
+            elif current_revenue > 0:
+                growth = 100.0
+            else:
+                growth = 0.0
+
+            stations_by_city.append({
+                'city': city_name,
+                'count': item.get('count', 0),
+                'revenue': current_revenue,
+                'growth': growth,
+            })
         
         # Recent activity from DB
         recent_activity = []
@@ -242,9 +335,9 @@ def get_admin_stats():
             'totalUsers': total_users,
             'totalOperators': total_operators,
             'totalStations': total_stations,
-            'totalRevenue': round(total_revenue, 2),
+            'totalRevenue': total_revenue,
             'activeChargers': active_chargers_count,
-            'totalEnergy': round(total_energy, 1),
+            'totalEnergy': total_energy,
             'monthlyGrowth': {
                 'users': round(user_growth, 1),
                 'revenue': 18.3,

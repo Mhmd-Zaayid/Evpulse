@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { stationsAPI, bookingsAPI, sessionsAPI, reviewsAPI, transactionsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
 import { getAiChargingOptimization, isAiConfigured } from '../../services/aiService';
-import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime } from '../../utils';
+import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime, formatStationAddress, resolveStationImageSrc } from '../../utils';
 import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
 import { useNotifications, useAuth } from '../../context';
 import {
@@ -471,6 +471,7 @@ const StationDetail = () => {
   const bestTimeLabel = peakStart && peakEnd
     ? `Try before ${peakStart} or after ${peakEnd}`
     : 'Prefer non-peak hours for better cost efficiency';
+  const stationImageSrc = resolveStationImageSrc(station);
   const activeSessionStationName = existingActiveSession?.stationName || 'Unknown Station';
   const activeSessionPort = existingActiveSession?.portId;
   const activeSessionStartLabel = existingActiveSession?.startTime
@@ -482,6 +483,7 @@ const StationDetail = () => {
         minute: '2-digit',
       })
     : 'N/A';
+  const displayAddress = formatStationAddress(station);
 
   return (
     <div className="space-y-6">
@@ -496,23 +498,23 @@ const StationDetail = () => {
 
       {/* Station Header */}
       <div className="card overflow-hidden">
-        <div className="relative h-48 -mx-6 -mt-6 mb-6">
+        <div className="relative h-52 md:h-60 -mx-6 -mt-6 mb-6 overflow-hidden rounded-t-2xl">
           <img
-            src={station.image}
+            src={stationImageSrc}
             alt={station.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
             onError={(e) => {
-              e.target.src = 'https://via.placeholder.com/800x200?text=EV+Station';
+              e.target.src = resolveStationImageSrc({});
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
           <div className="absolute bottom-4 left-6 right-6">
             <div className="flex items-start justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-white ml-4">{station.name}</h1>
                 <div className="flex items-center gap-2 mt-1 text-white/80">
                   <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{station.address}</span>
+                  <span className="text-sm">{displayAddress}</span>
                 </div>
               </div>
               <Badge variant={station.status === 'available' ? 'success' : station.status === 'busy' ? 'warning' : 'danger'} size="lg">

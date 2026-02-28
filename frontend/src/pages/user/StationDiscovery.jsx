@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { stationsAPI } from '../../services';
 import { useNotifications } from '../../context';
-import { formatDistance } from '../../utils';
+import { formatDistance, formatStationAddress } from '../../utils';
 import { StationCard, Button, Select, Input, LoadingSpinner, EmptyState } from '../../components';
 import { 
   Search, 
@@ -60,7 +60,7 @@ const StationDiscovery = () => {
         const normalizedStations = (response.data || []).map((station) => ({
           ...station,
           name: station?.name || 'Unnamed Station',
-          address: station?.address || 'Address not available',
+          address: formatStationAddress(station),
           ports: Array.isArray(station?.ports) ? station.ports : [],
           amenities: Array.isArray(station?.amenities) ? station.amenities : [],
           pricing: station?.pricing || {},
@@ -85,15 +85,8 @@ const StationDiscovery = () => {
   const normalizedSearchQuery = normalizeSearchValue(searchQuery);
 
   const filteredStations = stations.filter((station) => {
-    const stationName = normalizeSearchValue(station.name);
-    const stationAddress = normalizeSearchValue(station.address);
     const stationCity = normalizeSearchValue(station.city || station.location?.city);
-
-    return (
-      stationName.includes(normalizedSearchQuery) ||
-      stationAddress.includes(normalizedSearchQuery) ||
-      stationCity.includes(normalizedSearchQuery)
-    );
+    return stationCity.includes(normalizedSearchQuery);
   });
 
   const statusOptions = [
@@ -155,7 +148,7 @@ const StationDiscovery = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400" />
             <input
               type="text"
-              placeholder="Search by name or location..."
+              placeholder="Search by city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-secondary-50 border border-secondary-200 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"

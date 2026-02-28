@@ -178,14 +178,21 @@ def create_station():
         user_id = g.current_user_id
         data = request.get_json() or {}
 
-        for field in ['name', 'address', 'city']:
-            if not data.get(field):
-                return jsonify({'success': False, 'error': f'{field} is required'}), 400
+        name = str(data.get('name') or '').strip()
+        city = str(data.get('city') or '').strip()
+        nearby_landmark = str(data.get('nearbyLandmark') or data.get('address') or '').strip()
+
+        if not name:
+            return jsonify({'success': False, 'error': 'name is required'}), 400
+        if not city:
+            return jsonify({'success': False, 'error': 'city is required'}), 400
+        if not nearby_landmark:
+            return jsonify({'success': False, 'error': 'nearby landmark is required'}), 400
         
         station = Station(
-            name=data['name'],
-            address=data['address'],
-            city=data['city'],
+            name=name,
+            address=nearby_landmark,
+            city=city,
             coordinates=data.get('coordinates', {}),
             operator_id=user_id,
             amenities=data.get('amenities', []),
@@ -193,7 +200,8 @@ def create_station():
             ports=data.get('ports', []),
             pricing=data.get('pricing', {}),
             peak_hours=data.get('peakHours'),
-            image=data.get('image')
+            image=data.get('image'),
+            nearby_landmark=nearby_landmark
         )
         station.created_at = now_utc()
         station.updated_at = now_utc()
@@ -232,8 +240,28 @@ def update_station(station_id):
         
         # Update allowed fields
         allowed_fields = ['name', 'address', 'city', 'status', 'amenities', 
-                         'operating_hours', 'ports', 'pricing', 'peak_hours', 'image']
+                         'operating_hours', 'ports', 'pricing', 'peak_hours', 'image', 'nearby_landmark']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if 'nearbyLandmark' in data:
+            update_data['nearby_landmark'] = str(data.get('nearbyLandmark') or '').strip()
+
+        if 'address' in data and 'nearby_landmark' not in update_data:
+            update_data['nearby_landmark'] = str(data.get('address') or '').strip()
+
+        if any(key in data for key in ['city', 'address', 'nearbyLandmark', 'nearby_landmark']):
+            effective_city = str(update_data.get('city', station_data.get('city', '')) or '').strip()
+            effective_landmark = str(
+                update_data.get(
+                    'nearby_landmark',
+                    station_data.get('nearby_landmark') or station_data.get('address') or ''
+                )
+            ).strip()
+
+            update_data['city'] = effective_city
+            update_data['nearby_landmark'] = effective_landmark
+            update_data['address'] = Station.format_display_address(effective_city, effective_landmark)
+
         update_data['updated_at'] = now_utc()
         
         db.stations.update_one(

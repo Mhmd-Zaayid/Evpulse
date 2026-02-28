@@ -1,5 +1,6 @@
 from datetime import datetime
 from bson import ObjectId
+import re
 
 class Station:
     """Charging Station model for MongoDB"""
@@ -8,9 +9,10 @@ class Station:
     
     def __init__(self, name, address, city, coordinates, operator_id, status='available',
                  amenities=None, operating_hours='24/7', ports=None, pricing=None,
-                 peak_hours=None, image=None):
+                 peak_hours=None, image=None, nearby_landmark=None):
         self.name = name
-        self.address = address
+        self.nearby_landmark = self._clean_text(nearby_landmark) or self._clean_text(address)
+        self.address = self.format_display_address(city, self.nearby_landmark)
         self.city = city
         self.coordinates = coordinates  # {lat, lng}
         self.operator_id = operator_id
@@ -31,6 +33,7 @@ class Station:
         return {
             'name': self.name,
             'address': self.address,
+            'nearby_landmark': self.nearby_landmark,
             'city': self.city,
             'coordinates': self.coordinates,
             'operator_id': self.operator_id,
@@ -54,6 +57,7 @@ class Station:
         station.id = str(data.get('_id', ''))
         station.name = data.get('name')
         station.address = data.get('address')
+        station.nearby_landmark = data.get('nearby_landmark') or data.get('nearbyLandmark') or data.get('address')
         station.city = data.get('city')
         station.coordinates = data.get('coordinates', {})
         station.operator_id = data.get('operator_id')
@@ -72,10 +76,12 @@ class Station:
     
     def to_response_dict(self, distance=None):
         """Convert to API response format"""
+        display_address = self.format_display_address(self.city, self.nearby_landmark or self.address)
         result = {
             'id': self.id if hasattr(self, 'id') else None,
             'name': self.name,
-            'address': self.address,
+            'address': display_address,
+            'nearbyLandmark': self._clean_text(self.nearby_landmark),
             'city': self.city,
             'coordinates': self.coordinates,
             'operatorId': str(self.operator_id) if self.operator_id else None,
@@ -92,3 +98,22 @@ class Station:
         if distance is not None:
             result['distance'] = distance
         return result
+
+    @staticmethod
+    def _clean_text(value):
+        return str(value or '').strip()
+
+    @staticmethod
+    def format_display_address(city, nearby_landmark):
+        city_text = Station._clean_text(city)
+        landmark_text = Station._clean_text(nearby_landmark)
+
+        if city_text and landmark_text:
+            city_prefix_pattern = r'^\s*' + re.escape(city_text) + r'\s*[-,]'
+            if re.match(city_prefix_pattern, landmark_text, re.IGNORECASE):
+                return landmark_text
+            if landmark_text.lower() == city_text.lower():
+                return city_text
+            return f'{city_text} - {landmark_text}'
+
+        return city_text or landmark_text

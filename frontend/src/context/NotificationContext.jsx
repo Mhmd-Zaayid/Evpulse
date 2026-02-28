@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { notificationsAPI } from '../services';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
 
@@ -11,62 +13,66 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'success',
-      title: 'Charging Complete',
-      message: 'Your vehicle has been fully charged at GreenCharge Hub.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'info',
-      title: 'Booking Confirmed',
-      message: 'Your slot at PowerGrid Station has been confirmed for 3:00 PM.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'warning',
-      title: 'Peak Hours Alert',
-      message: 'Charging rates will increase by 20% from 6 PM to 9 PM.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-      read: true,
-    },
-    {
-      id: 4,
-      type: 'info',
-      title: 'New Station Nearby',
-      message: 'A new charging station opened 2km from your location.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      read: true,
-    },
-  ]);
+  const { user, isAuthenticated } = useAuth();
+  const [notifications, setNotifications] = useState([]);
 
   const [toasts, setToasts] = useState([]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      const response = await notificationsAPI.getByUser(user.id);
+      if (response?.success) {
+        setNotifications(response.data || []);
+      } else {
+        setNotifications([]);
+      }
+    } catch {
+      setNotifications([]);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const addNotification = useCallback((notification) => {
     const newNotification = {
       id: Date.now(),
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       read: false,
       ...notification,
     };
     setNotifications(prev => [newNotification, ...prev]);
   }, []);
 
-  const markAsRead = useCallback((id) => {
+  const markAsRead = useCallback(async (id) => {
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true } : n))
     );
+
+    try {
+      await notificationsAPI.markAsRead(id);
+    } catch {
+    }
   }, []);
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
+
+    if (!user?.id) {
+      return;
+    }
+
+    try {
+      await notificationsAPI.markAllAsRead(user.id);
+    } catch {
+    }
+  }, [user?.id]);
 
   const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -91,6 +97,7 @@ export const NotificationProvider = ({ children }) => {
     toasts,
     unreadCount,
     addNotification,
+    refreshNotifications,
     markAsRead,
     markAllAsRead,
     removeNotification,

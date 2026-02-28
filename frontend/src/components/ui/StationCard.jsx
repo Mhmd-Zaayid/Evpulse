@@ -1,7 +1,8 @@
 import { MapPin, Star, Zap, Clock, ChevronRight, Navigation, Plug } from 'lucide-react';
-import { formatCurrency, formatDistance, getStatusColor, getStatusText } from '../../utils';
+import { formatCurrency, formatDistance, getStatusText, formatStationAddress, resolveStationImageSrc } from '../../utils';
 
 const StationCard = ({ station, onClick, compact = false }) => {
+  const resolvedImageSrc = resolveStationImageSrc(station);
   const availablePorts = station.ports?.filter(p => p.status === 'available').length || 0;
   const totalPorts = station.ports?.length || 0;
   const portTypes = [...new Set(station.ports?.map(p => p.type) || [])];
@@ -12,6 +13,7 @@ const StationCard = ({ station, onClick, compact = false }) => {
     station.pricing?.fast?.base ??
     station.pricing?.perKwh ??
     0;
+  const displayAddress = formatStationAddress(station);
 
   if (compact) {
     return (
@@ -22,12 +24,12 @@ const StationCard = ({ station, onClick, compact = false }) => {
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-secondary-100 to-secondary-200 overflow-hidden flex-shrink-0 ring-2 ring-secondary-100">
             <img 
-              src={station.image} 
+              src={resolvedImageSrc}
               alt={station.name}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=100&h=100&fit=crop';
+                e.target.src = resolveStationImageSrc({});
               }}
             />
           </div>
@@ -38,7 +40,7 @@ const StationCard = ({ station, onClick, compact = false }) => {
             </h3>
             <p className="text-sm text-secondary-500 truncate flex items-center gap-1 mt-0.5">
               <MapPin className="w-3.5 h-3.5" />
-              {station.address}
+              {displayAddress}
             </p>
             <div className="flex items-center gap-3 mt-2">
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -76,12 +78,12 @@ const StationCard = ({ station, onClick, compact = false }) => {
       {/* Image */}
       <div className="relative h-44 overflow-hidden">
         <img 
-          src={station.image} 
+          src={resolvedImageSrc}
           alt={station.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
           onError={(e) => {
             e.target.onerror = null;
-            e.target.src = 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=400&h=200&fit=crop';
+            e.target.src = resolveStationImageSrc({});
           }}
         />
         
@@ -115,7 +117,7 @@ const StationCard = ({ station, onClick, compact = false }) => {
           <h3 className="font-bold text-white text-lg drop-shadow-lg">{station.name}</h3>
           <p className="text-white/80 text-sm flex items-center gap-1 mt-0.5">
             <MapPin className="w-3.5 h-3.5" />
-            {station.address}
+            {displayAddress}
           </p>
         </div>
       </div>

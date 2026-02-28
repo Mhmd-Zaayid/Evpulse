@@ -123,8 +123,8 @@ const Dashboard = () => {
   const topRegions = (stats?.stationsByCity || []).map((item) => ({
     name: item.city,
     stations: item.count,
-    revenue: 0,
-    growth: 0,
+    revenue: Number(item.revenue || 0),
+    growth: Number(item.growth || 0),
   }));
 
   const recentActivity = (stats?.recentActivity || []).map((activity) => ({

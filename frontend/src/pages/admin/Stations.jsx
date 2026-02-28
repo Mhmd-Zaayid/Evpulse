@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNotifications } from '../../context';
 import { adminAPI } from '../../services';
-import { formatCurrency, formatDate } from '../../utils';
+import { formatCurrency, formatDate, formatStationAddress, resolveStationImageSrc } from '../../utils';
 import { Button, Input, Select, Modal, Table, Badge, EmptyState, LoadingSpinner } from '../../components';
 import {
   Building2,
@@ -65,7 +65,8 @@ const Stations = () => {
           return {
             id: station.id,
             name: station.name || 'Unknown Station',
-            address: station.address || 'N/A',
+            address: formatStationAddress(station),
+            image: resolveStationImageSrc(station),
             city: station.city || station.location?.city || '',
             operator: station.operatorName || station.operator || 'Unknown Operator',
             operatorId: station.operatorId || '',
@@ -92,9 +93,7 @@ const Stations = () => {
 
   const filteredStations = stations.filter(station => {
     const normalizedSearchQuery = normalizeSearchValue(searchQuery);
-    const matchesSearch = normalizeSearchValue(station.name).includes(normalizedSearchQuery) ||
-                         normalizeSearchValue(station.address).includes(normalizedSearchQuery) ||
-                         normalizeSearchValue(station.city).includes(normalizedSearchQuery);
+    const matchesSearch = normalizeSearchValue(station.city).includes(normalizedSearchQuery);
     const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
     const matchesOperator = operatorFilter === 'all' || station.operatorId === operatorFilter;
     return matchesSearch && matchesStatus && matchesOperator;
@@ -185,11 +184,22 @@ const Stations = () => {
       key: 'name',
       label: 'Station',
       render: (value, row) => (
-        <div>
-          <p className="font-medium text-secondary-900">{value}</p>
-          <div className="flex items-center gap-1 text-sm text-secondary-500">
-            <MapPin className="w-3 h-3" />
-            <span className="truncate max-w-[200px]">{row.address}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={row.image}
+            alt={value}
+            className="w-10 h-10 rounded-lg object-cover border border-secondary-200 flex-shrink-0"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = resolveStationImageSrc({});
+            }}
+          />
+          <div className="min-w-0">
+            <p className="font-medium text-secondary-900 truncate">{value}</p>
+            <div className="flex items-center gap-1 text-sm text-secondary-500">
+              <MapPin className="w-3 h-3" />
+              <span className="truncate max-w-[200px]">{row.address}</span>
+            </div>
           </div>
         </div>
       ),
@@ -370,7 +380,7 @@ const Stations = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search stations..."
+              placeholder="Search by city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               icon={Search}

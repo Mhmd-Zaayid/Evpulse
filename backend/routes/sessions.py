@@ -4,12 +4,22 @@ from models.notification import Notification
 from datetime import datetime, timedelta
 import math
 from models.transaction import Transaction
+from pymongo.errors import DuplicateKeyError
 
 from routes.common import role_required, to_object_id, now_utc
 
 sessions_bp = Blueprint('sessions', __name__)
 
 DB_UNAVAILABLE = {'success': False, 'error': 'Database connection unavailable. Please try again later.'}
+
+
+def _ensure_active_session_index(db):
+    db.sessions.create_index(
+        [('user_id', 1), ('status', 1)],
+        name='uniq_user_active_session',
+        unique=True,
+        partialFilterExpression={'status': 'active'}
+    )
 
 
 def _build_user_name_map(db, user_ids):
@@ -82,6 +92,51 @@ def _to_number(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _to_amount(value):
+    try:
+        if value is None:
+            return 0.0
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _resolve_transaction_amount(db, transaction):
+    amount = _to_amount(transaction.get('amount'))
+    if amount > 0:
+        return amount
+
+    session_id = transaction.get('session_id')
+    session_oid = to_object_id(session_id)
+    if not session_oid:
+        return 0.0
+
+    session = db.sessions.find_one({'_id': session_oid}, {'cost': 1, 'total_cost': 1})
+    if not session:
+        return 0.0
+
+    return _to_amount(session.get('cost') or session.get('total_cost'))
+
+
+def _get_wallet_balance(db, user_id):
+    topups = list(db.transactions.find({
+        'user_id': user_id,
+        'type': 'wallet_topup',
+        'status': 'completed'
+    }))
+
+    wallet_payments = list(db.transactions.find({
+        'user_id': user_id,
+        'payment_method': 'Wallet',
+        'type': 'charging',
+        'status': 'completed'
+    }))
+
+    total_topup = sum(_to_amount(txn.get('amount')) for txn in topups)
+    total_spent = sum(_resolve_transaction_amount(db, txn) for txn in wallet_payments)
+    return round(max(0.0, total_topup - total_spent), 2)
 
 @sessions_bp.route('', methods=['GET'])
 @role_required('user', 'operator', 'admin')
@@ -158,6 +213,12 @@ def start_session():
         station_id = to_object_id(data.get('stationId'))
         if not station_id:
             return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
+
+        station = db.stations.find_one({'_id': station_id}, {'name': 1, 'ports': 1})
+        if not station:
+            return jsonify({'success': False, 'error': 'Station not found'}), 404
+
+        _ensure_active_session_index(db)
         
         # Check if user already has an active session
         existing = db.sessions.find_one({
@@ -168,9 +229,18 @@ def start_session():
         if existing:
             return jsonify({
                 'success': False, 
-                'error': 'You already have an active charging session'
+                'error': 'You already have an active charging session.'
             }), 400
         
+        payment_method = data.get('paymentMethod', 'Wallet')
+        if str(payment_method).lower() == 'wallet':
+            wallet_balance = _get_wallet_balance(db, user_id)
+            if wallet_balance <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Insufficient wallet balance'
+                }), 400
+
         # Update port status to busy
         db.stations.update_one(
             {'_id': station_id, 'ports.id': data['portId']},
@@ -183,19 +253,26 @@ def start_session():
             station_id=station_id,
             port_id=data['portId'],
             charging_type=data.get('chargingType', 'Normal AC'),
-            payment_method=data.get('paymentMethod', 'Wallet')
+            payment_method=payment_method,
+            station_name=station.get('name')
         )
         session.battery_start = data.get('batteryStart', 20)
         session.estimated_completion = now_utc() + timedelta(minutes=45)
         session.created_at = now_utc()
         session.updated_at = now_utc()
         
-        result = db.sessions.insert_one(session.to_dict())
+        try:
+            result = db.sessions.insert_one(session.to_dict())
+        except DuplicateKeyError:
+            return jsonify({
+                'success': False,
+                'error': 'You already have an active charging session.'
+            }), 400
         session.id = str(result.inserted_id)
         
         return jsonify({
             'success': True,
-            'message': 'Charging session started',
+            'message': 'Charging session started successfully.',
             'data': session.to_response_dict()
         }), 201
     except Exception as e:
@@ -261,13 +338,12 @@ def stop_session(session_id):
             energy_delivered = round(max(0.1, estimated_energy), 1)
 
         requested_cost = _to_number(payload.get('totalCost'))
-        if requested_cost is not None and requested_cost > 0:
+        if requested_cost is not None and requested_cost >= 0:
             total_cost = float(requested_cost)
         else:
             total_cost = energy_delivered * energy_rate
 
-        # Product constraint: cap charging session billing at ₹50
-        total_cost = round(min(50.0, max(1.0, total_cost)), 2)
+        total_cost = round(max(0.0, total_cost), 2)
         
         # Update session
         db.sessions.update_one(

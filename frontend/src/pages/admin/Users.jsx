@@ -6,18 +6,11 @@ import { Button, Input, Select, Modal, Table, Badge, EmptyState, LoadingSpinner 
 import {
   Users as UsersIcon,
   Search,
-  Filter,
-  Edit,
   Trash2,
-  MoreVertical,
-  Mail,
-  Phone,
   Calendar,
   Shield,
   Ban,
   CheckCircle,
-  XCircle,
-  Eye,
 } from 'lucide-react';
 
 const Users = () => {
@@ -28,7 +21,6 @@ const Users = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -81,20 +73,32 @@ const Users = () => {
     currentPage * itemsPerPage
   );
 
-  const handleEditUser = (user) => {
-    setSelectedUser(user);
-    setShowUserModal(true);
-  };
-
   const handleDeleteUser = (user) => {
     setSelectedUser(user);
     setShowDeleteModal(true);
   };
 
   const handleConfirmDelete = async () => {
-    showToast({ type: 'error', message: 'User deletion API is not available yet' });
-    setShowDeleteModal(false);
-    setSelectedUser(null);
+    if (!selectedUser?.id) {
+      setShowDeleteModal(false);
+      setSelectedUser(null);
+      return;
+    }
+
+    try {
+      const response = await adminAPI.deleteUser(selectedUser.id);
+      if (response?.success) {
+        showToast({ type: 'success', message: response.message || 'User deleted successfully' });
+        await fetchUsers();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to delete user' });
+      }
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to delete user' });
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedUser(null);
+    }
   };
 
   const handleToggleStatus = async (user) => {
@@ -189,13 +193,6 @@ const Users = () => {
       label: 'Actions',
       render: (_, row) => (
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleEditUser(row)}
-            className="p-2 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            title="Edit"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
           {row.status === 'pending' && row.role === 'operator' && (
             <button
               onClick={() => handleApproveOperator(row)}
@@ -396,66 +393,6 @@ const Users = () => {
             </Button>
           </div>
         </div>
-      </Modal>
-
-      {/* Edit User Modal */}
-      <Modal
-        isOpen={showUserModal}
-        onClose={() => {
-          setShowUserModal(false);
-          setSelectedUser(null);
-        }}
-        title="Edit User"
-        size="md"
-      >
-        {selectedUser && (
-          <div className="space-y-4">
-            <Input
-              label="Full Name"
-              defaultValue={selectedUser.name}
-            />
-            <Input
-              label="Email"
-              type="email"
-              defaultValue={selectedUser.email}
-            />
-            <Input
-              label="Phone"
-              defaultValue={selectedUser.phone}
-            />
-            <Select label="Role" defaultValue={selectedUser.role}>
-              <option value="user">User</option>
-              <option value="operator">Operator</option>
-              <option value="admin">Admin</option>
-            </Select>
-            <Select label="Status" defaultValue={selectedUser.status}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="secondary"
-                fullWidth
-                onClick={() => {
-                  setShowUserModal(false);
-                  setSelectedUser(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                fullWidth
-                onClick={() => {
-                  showToast({ type: 'success', message: 'User updated successfully!' });
-                  setShowUserModal(false);
-                  setSelectedUser(null);
-                }}
-              >
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   );

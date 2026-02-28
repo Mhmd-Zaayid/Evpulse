@@ -116,9 +116,26 @@ const Stations = () => {
   };
 
   const handleConfirmDelete = async () => {
-    showToast({ type: 'error', message: 'Station deletion API is not available yet' });
-    setShowDeleteModal(false);
-    setSelectedStation(null);
+    if (!selectedStation?.id) {
+      setShowDeleteModal(false);
+      setSelectedStation(null);
+      return;
+    }
+
+    try {
+      const response = await adminAPI.deleteStation(selectedStation.id);
+      if (response?.success) {
+        showToast({ type: 'success', message: response.message || 'Station deleted successfully' });
+        await fetchStations();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to delete station' });
+      }
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to delete station' });
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedStation(null);
+    }
   };
 
   const handleToggleStatus = async (station) => {

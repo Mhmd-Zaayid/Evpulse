@@ -3,7 +3,8 @@ from database import get_db
 from models.booking import Booking
 from models.notification import Notification
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, time
+from pymongo.errors import DuplicateKeyError
 
 from routes.common import role_required, to_object_id, now_utc
 
@@ -16,6 +17,95 @@ AVAILABLE_TIME_SLOTS = [
     '16:00 - 17:00', '17:00 - 18:00', '18:00 - 19:00', '19:00 - 20:00',
     '20:00 - 21:00'
 ]
+
+
+def _normalize_port_id(port_id):
+    if port_id is None:
+        return None
+    try:
+        return int(port_id)
+    except (TypeError, ValueError):
+        return port_id
+
+
+def _parse_booking_date(date_value):
+    if not date_value:
+        return None
+    try:
+        return datetime.strptime(str(date_value), '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def _parse_slot_range(time_slot):
+    if not time_slot or '-' not in str(time_slot):
+        return None, None
+
+    start_raw, end_raw = [piece.strip() for piece in str(time_slot).split('-', 1)]
+    try:
+        start_time = datetime.strptime(start_raw, '%H:%M').time()
+        end_time = datetime.strptime(end_raw, '%H:%M').time()
+        return start_time, end_time
+    except ValueError:
+        return None, None
+
+
+def _humanize_slot_label(time_slot):
+    start_time, end_time = _parse_slot_range(time_slot)
+    if not start_time or not end_time:
+        return str(time_slot)
+
+    start_label = str(int(start_time.strftime('%H')))
+    end_label = str(int(end_time.strftime('%H')))
+    return f'{start_label}–{end_label}'
+
+
+def _slot_has_ended(booking_date_str, time_slot, now_dt):
+    booking_date = _parse_booking_date(booking_date_str)
+    _, slot_end = _parse_slot_range(time_slot)
+    if not booking_date or not slot_end:
+        return False
+
+    slot_end_dt = datetime.combine(booking_date, slot_end)
+    return slot_end_dt <= now_dt
+
+
+def _ensure_booking_indexes(db):
+    db.bookings.create_index(
+        [
+            ('station_id', 1),
+            ('port_id', 1),
+            ('date', 1),
+            ('time_slot', 1)
+        ],
+        name='uniq_active_slot_booking',
+        unique=True,
+        partialFilterExpression={'status': {'$in': ['confirmed', 'pending']}}
+    )
+
+
+def _refresh_elapsed_bookings(db, station_id=None, date=None, port_id=None):
+    now_dt = now_utc()
+    query = {'status': {'$in': ['confirmed', 'pending']}}
+    if station_id is not None:
+        query['station_id'] = station_id
+    if date:
+        query['date'] = date
+    if port_id is not None:
+        query['port_id'] = _normalize_port_id(port_id)
+
+    active_bookings = list(db.bookings.find(query, {'_id': 1, 'date': 1, 'time_slot': 1}))
+    expired_ids = [
+        booking['_id']
+        for booking in active_bookings
+        if _slot_has_ended(booking.get('date'), booking.get('time_slot'), now_dt)
+    ]
+
+    if expired_ids:
+        db.bookings.update_many(
+            {'_id': {'$in': expired_ids}},
+            {'$set': {'status': 'completed', 'updated_at': now_utc()}}
+        )
 
 def _serialize_bookings(bookings_data, db):
     bookings = []
@@ -75,11 +165,35 @@ def create_booking():
         station_id = to_object_id(data.get('stationId'))
         if not station_id:
             return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
+
+        requested_date = _parse_booking_date(data.get('date'))
+        if not requested_date:
+            return jsonify({'success': False, 'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+
+        slot_start, slot_end = _parse_slot_range(data.get('timeSlot'))
+        if not slot_start or not slot_end:
+            return jsonify({'success': False, 'error': 'Invalid time slot format'}), 400
+
+        now_dt = now_utc()
+        slot_start_dt = datetime.combine(requested_date, slot_start)
+        slot_end_dt = datetime.combine(requested_date, slot_end)
+        if slot_end_dt <= now_dt:
+            return jsonify({'success': False, 'error': 'Cannot book a slot that has already ended'}), 400
+
+        normalized_port_id = _normalize_port_id(data.get('portId'))
+
+        _ensure_booking_indexes(db)
+        _refresh_elapsed_bookings(
+            db,
+            station_id=station_id,
+            date=data.get('date'),
+            port_id=normalized_port_id
+        )
         
         # Check if slot is available
         existing = db.bookings.find_one({
             'station_id': station_id,
-            'port_id': data['portId'],
+            'port_id': normalized_port_id,
             'date': data['date'],
             'time_slot': data['timeSlot'],
             'status': {'$in': ['confirmed', 'pending']}
@@ -101,7 +215,7 @@ def create_booking():
         booking = Booking(
             user_id=user_id,
             station_id=station_id,
-            port_id=data['portId'],
+            port_id=normalized_port_id,
             date=data['date'],
             time_slot=data['timeSlot'],
             charging_type=charging_type,
@@ -109,8 +223,12 @@ def create_booking():
         )
         booking.created_at = now_utc()
         booking.updated_at = now_utc()
-        
-        result = db.bookings.insert_one(booking.to_dict())
+
+        try:
+            result = db.bookings.insert_one(booking.to_dict())
+        except DuplicateKeyError:
+            return jsonify({'success': False, 'error': 'Time slot is already booked'}), 400
+
         booking.id = str(result.inserted_id)
         
         # Create notification
@@ -118,7 +236,7 @@ def create_booking():
             user_id=str(user_id),
             notification_type='booking_confirmed',
             title='Booking Confirmed',
-            message=f'Your booking at {station["name"]} for {data["date"]}, {data["timeSlot"]} has been confirmed.',
+            message=f'You have booked {_humanize_slot_label(data["timeSlot"])} slot at {station["name"]} on {data["date"]}.',
             action_url='/user/bookings'
         )
         db.notifications.insert_one(notification.to_dict())
@@ -185,6 +303,15 @@ def get_available_slots():
         station_oid = to_object_id(station_id)
         if not station_oid:
             return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
+
+        _ensure_booking_indexes(db)
+        normalized_port_id = _normalize_port_id(port_id)
+        _refresh_elapsed_bookings(
+            db,
+            station_id=station_oid,
+            date=date,
+            port_id=normalized_port_id
+        )
         
         # Find booked slots
         query = {
@@ -192,16 +319,23 @@ def get_available_slots():
             'date': date,
             'status': {'$in': ['confirmed', 'pending']}
         }
-        if port_id:
-            query['port_id'] = int(port_id)
+        if normalized_port_id is not None:
+            query['port_id'] = normalized_port_id
         
         booked = list(db.bookings.find(query))
         booked_slots = [b['time_slot'] for b in booked]
-        
-        # Return available slots
-        available = [slot for slot in AVAILABLE_TIME_SLOTS if slot not in booked_slots]
-        
-        return jsonify({'success': True, 'data': available})
+
+        slot_statuses = [
+            {
+                'slot': slot,
+                'status': 'booked' if slot in booked_slots else 'available',
+                'isBooked': slot in booked_slots,
+            }
+            for slot in AVAILABLE_TIME_SLOTS
+        ]
+        available = [entry['slot'] for entry in slot_statuses if entry['status'] == 'available']
+
+        return jsonify({'success': True, 'data': slot_statuses, 'availableSlots': available})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

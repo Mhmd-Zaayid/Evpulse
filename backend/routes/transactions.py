@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from models.transaction import Transaction
+from models.notification import Notification
 
 from routes.common import role_required, to_object_id, now_utc
 
@@ -17,9 +18,14 @@ def _to_amount(value):
 
 def _resolve_charging_amounts(db, transactions_data, persist=False):
     charging_session_ids = []
+    normalized_session_ids = {}
     for txn in transactions_data:
         if txn.get('type') == 'charging' and _to_amount(txn.get('amount')) <= 0 and txn.get('session_id'):
-            charging_session_ids.append(txn.get('session_id'))
+            session_id = txn.get('session_id')
+            session_oid = to_object_id(session_id)
+            if session_oid:
+                charging_session_ids.append(session_oid)
+                normalized_session_ids[session_id] = session_oid
 
     if not charging_session_ids:
         return transactions_data
@@ -39,7 +45,8 @@ def _resolve_charging_amounts(db, transactions_data, persist=False):
             continue
 
         session_id = txn.get('session_id')
-        resolved_amount = session_cost_map.get(session_id, 0.0)
+        normalized_session_id = normalized_session_ids.get(session_id) or to_object_id(session_id)
+        resolved_amount = session_cost_map.get(normalized_session_id, 0.0)
         if resolved_amount > 0:
             txn['amount'] = resolved_amount
             if persist and txn.get('_id'):
@@ -115,6 +122,17 @@ def process_payment():
         
         result = db.transactions.insert_one(transaction.to_dict())
         transaction.id = str(result.inserted_id)
+
+        payment_amount = _to_amount(data.get('amount'))
+        payment_method = data.get('paymentMethod', 'Card')
+        payment_notification = Notification(
+            user_id=str(user_id),
+            notification_type='payment_success',
+            title='Payment Successful',
+            message=f'Payment of ₹{payment_amount:.2f} via {payment_method} was successful.',
+            action_url='/user/payments'
+        )
+        db.notifications.insert_one(payment_notification.to_dict())
         
         return jsonify({
             'success': True,
@@ -187,6 +205,17 @@ def topup_wallet():
         transaction.timestamp = now_utc()
         
         result = db.transactions.insert_one(transaction.to_dict())
+
+        payment_amount = _to_amount(amount)
+        payment_method = data.get('paymentMethod', 'Card')
+        topup_notification = Notification(
+            user_id=str(user_id),
+            notification_type='payment_success',
+            title='Payment Successful',
+            message=f'Wallet top-up of ₹{payment_amount:.2f} via {payment_method} was successful.',
+            action_url='/user/payments'
+        )
+        db.notifications.insert_one(topup_notification.to_dict())
         
         # Get new balance
         topups = list(db.transactions.find({

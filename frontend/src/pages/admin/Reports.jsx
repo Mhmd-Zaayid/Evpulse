@@ -3,8 +3,6 @@ import { adminAPI } from '../../services';
 import { formatCurrency, formatEnergy } from '../../utils';
 import { Button, Select, LoadingSpinner } from '../../components';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   AreaChart,
@@ -32,8 +30,6 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month');
   const [stats, setStats] = useState(null);
-  const [sessionsByHour, setSessionsByHour] = useState([]);
-  const [stationPerformance, setStationPerformance] = useState([]);
 
   useEffect(() => {
     fetchReportData();
@@ -42,46 +38,13 @@ const Reports = () => {
   const fetchReportData = async () => {
     setLoading(true);
     try {
-      const [statsResponse, sessionsResponse, stationsResponse] = await Promise.all([
-        adminAPI.getStats(),
-        adminAPI.getAllSessions(),
-        adminAPI.getAllStations(),
-      ]);
+      const [statsResponse] = await Promise.all([adminAPI.getStats()]);
 
       if (statsResponse?.success) {
         setStats(statsResponse.data || {});
       } else {
         setStats({});
       }
-
-      const sessions = sessionsResponse?.success ? (sessionsResponse.data || []) : [];
-      const hours = Array.from({ length: 24 }, (_, hour) => ({
-        hour: `${hour.toString().padStart(2, '0')}:00`,
-        sessions: 0,
-      }));
-      sessions.forEach((session) => {
-        if (!session?.startTime) {
-          return;
-        }
-        const hour = new Date(session.startTime).getHours();
-        if (hour >= 0 && hour < 24) {
-          hours[hour].sessions += 1;
-        }
-      });
-      setSessionsByHour(hours.filter((item, index) => index % 3 === 0));
-
-      const stations = stationsResponse?.success ? (stationsResponse.data || []) : [];
-      const stationRows = stations
-        .map((station) => ({
-          name: station.name || 'Unknown Station',
-          utilization: Math.round(((station.ports || []).filter((port) => port.status !== 'offline').length / Math.max((station.ports || []).length, 1)) * 100),
-          revenue: 0,
-          sessions: 0,
-          rating: station.rating || 0,
-        }))
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 5);
-      setStationPerformance(stationRows);
     } finally {
       setLoading(false);
     }
@@ -106,6 +69,14 @@ const Reports = () => {
       trend: (stats?.monthlyGrowth?.users ?? 0) >= 0 ? 'up' : 'down',
       icon: Users,
       color: 'bg-blue-100 text-blue-600',
+    },
+    {
+      label: 'Total Operators',
+      value: (stats?.totalOperators || 0).toLocaleString(),
+      change: `${stats?.monthlyGrowth?.stations ?? 0}%`,
+      trend: (stats?.monthlyGrowth?.stations ?? 0) >= 0 ? 'up' : 'down',
+      icon: Building2,
+      color: 'bg-indigo-100 text-indigo-600',
     },
     {
       label: 'Energy Delivered',
@@ -153,7 +124,7 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiCards.map((kpi) => (
           <div key={kpi.label} className="rounded-2xl shadow-lg shadow-green-500/10 p-5 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02]">
             <div className="flex items-start justify-between">
@@ -212,53 +183,6 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="card">
-        <h3 className="text-lg font-semibold text-secondary-900 mb-6">Top Rated Stations</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-secondary-200">
-                <th className="text-left py-3 px-4 font-semibold text-secondary-700">Station</th>
-                <th className="text-left py-3 px-4 font-semibold text-secondary-700">Utilization</th>
-                <th className="text-left py-3 px-4 font-semibold text-secondary-700">Revenue</th>
-                <th className="text-left py-3 px-4 font-semibold text-secondary-700">Sessions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stationPerformance.map((station) => (
-                <tr key={station.name} className="border-b border-secondary-100 hover:bg-secondary-50">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-primary-600" />
-                      </div>
-                      <span className="font-medium text-secondary-900">{station.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-secondary-700">{station.utilization}%</td>
-                  <td className="py-3 px-4 font-medium text-secondary-900">{formatCurrency(station.revenue)}</td>
-                  <td className="py-3 px-4 text-secondary-700">{station.sessions.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3 className="text-lg font-semibold text-secondary-900 mb-6">Sessions by Time of Day</h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sessionsByHour}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="hour" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip />
-              <Line type="monotone" dataKey="sessions" name="Sessions" stroke="#8b5cf6" strokeWidth={3} dot={{ fill: '#8b5cf6', strokeWidth: 2 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
     </div>
   );
 };

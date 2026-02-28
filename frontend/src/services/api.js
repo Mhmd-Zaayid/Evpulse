@@ -349,6 +349,16 @@ export const adminAPI = {
     }
   },
 
+  async refundTransaction(transactionId) {
+    try {
+      return await apiRequest(`/admin/transactions/${transactionId}/refund`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
   async updateUserStatus(userId, status) {
     try {
       return await apiRequest(`/admin/users/${userId}/status`, {
@@ -360,11 +370,31 @@ export const adminAPI = {
     }
   },
 
+  async deleteUser(userId) {
+    try {
+      return await apiRequest(`/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
   async updateStationStatus(stationId, status) {
     try {
       return await apiRequest(`/admin/stations/${stationId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status }),
+      });
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
+  async deleteStation(stationId) {
+    try {
+      return await apiRequest(`/admin/stations/${stationId}`, {
+        method: 'DELETE',
       });
     } catch (error) {
       return safeError(error);

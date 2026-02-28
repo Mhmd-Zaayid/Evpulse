@@ -66,6 +66,14 @@ const Dashboard = () => {
       color: 'primary',
     },
     {
+      title: 'Total Operators',
+      value: formatNumber(stats.totalOperators),
+      change: '+8.7%',
+      trend: 'up',
+      icon: Building2,
+      color: 'secondary',
+    },
+    {
       title: 'Total Stations',
       value: formatNumber(stats.totalStations),
       change: '+12.5%',
@@ -93,18 +101,18 @@ const Dashboard = () => {
 
   const revenueData = (stats?.revenueByMonth || []).map((item) => ({
     date: item.month,
-    revenue: item.revenue,
-    users: 0,
+    revenue: Number(item.revenue || 0),
+    users: Number(item.users || 0),
   }));
 
-  const energyData = (stats?.revenueByMonth || []).map((item) => ({
+  const energyData = (stats?.energyByMonth || stats?.revenueByMonth || []).map((item) => ({
     date: item.month,
-    energy: 0,
+    energy: Number(item.energy || 0),
   }));
 
-  const userGrowthData = (stats?.revenueByMonth || []).map((item) => ({
+  const userGrowthData = (stats?.userGrowthByMonth || stats?.revenueByMonth || []).map((item) => ({
     month: item.month,
-    users: 0,
+    users: Number(item.users || 0),
   }));
 
   const stationStatusData = [
@@ -150,7 +158,7 @@ const Dashboard = () => {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {summaryStats.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}

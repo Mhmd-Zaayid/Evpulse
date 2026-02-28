@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { stationsAPI, bookingsAPI, sessionsAPI, reviewsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
+import { stationsAPI, bookingsAPI, sessionsAPI, reviewsAPI, transactionsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
 import { getAiChargingOptimization, isAiConfigured } from '../../services/aiService';
 import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime } from '../../utils';
 import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
@@ -32,6 +32,12 @@ import {
   Settings2,
 } from 'lucide-react';
 
+const ESTIMATED_COST_MIN = 1;
+const ESTIMATED_COST_MAX = 250;
+
+const clampEstimatedCost = (cost) =>
+  Number(Math.min(ESTIMATED_COST_MAX, Math.max(ESTIMATED_COST_MIN, Number(cost) || 0)).toFixed(2));
+
 const StationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -48,6 +54,7 @@ const StationDetail = () => {
   const [isCharging, setIsCharging] = useState(false);
   const [chargingProgress, setChargingProgress] = useState(0);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [existingActiveSession, setExistingActiveSession] = useState(null);
   
   // AI-based states
   const [currentBattery, setCurrentBattery] = useState(35);
@@ -74,6 +81,10 @@ const StationDetail = () => {
     fetchStationDetails();
     fetchReviews();
   }, [id]);
+
+  useEffect(() => {
+    fetchActiveSession();
+  }, [user?.id]);
 
   // Update AI recommendations when battery level changes
   useEffect(() => {
@@ -125,6 +136,24 @@ const StationDetail = () => {
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
+    }
+  };
+
+  const fetchActiveSession = async () => {
+    if (!user?.id) {
+      setExistingActiveSession(null);
+      return;
+    }
+
+    try {
+      const response = await sessionsAPI.getActive(user.id);
+      if (response?.success) {
+        const active = response.data || null;
+        setExistingActiveSession(active);
+        setActiveSessionId(active?.id || null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch active session:', error);
     }
   };
 
@@ -241,7 +270,24 @@ const StationDetail = () => {
       return;
     }
 
+    if (!user?.id) {
+      showToast({ type: 'error', message: 'Unable to validate wallet balance. Please log in again.' });
+      return;
+    }
+
+    if (existingActiveSession?.id) {
+      showToast({ type: 'error', message: 'You already have an active charging session.' });
+      return;
+    }
+
     try {
+      const walletRes = await transactionsAPI.getWalletBalance(user.id);
+      const walletBalance = Number(walletRes?.data?.balance ?? 0);
+      if (!walletRes?.success || walletBalance <= 0) {
+        showToast({ type: 'error', message: 'Insufficient wallet balance' });
+        return;
+      }
+
       const response = await sessionsAPI.startSession({
         stationId: id,
         portId: selectedPort.id,
@@ -256,10 +302,11 @@ const StationDetail = () => {
       }
 
       setActiveSessionId(response.data?.id || null);
+      setExistingActiveSession(response.data || null);
       setIsCharging(true);
       setShowChargingModal(true);
       setChargingProgress(0);
-      showToast({ type: 'success', message: 'Charging session started' });
+      showToast({ type: 'success', message: response.message || 'Charging session started successfully.' });
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to start charging session' });
     }
@@ -288,6 +335,7 @@ const StationDetail = () => {
       setChargingProgress(0);
       setShowChargingModal(false);
       setActiveSessionId(null);
+      setExistingActiveSession(null);
       showToast({ type: 'success', message: 'Charging session completed!' });
       setTimeout(() => setShowRatingModal(true), 500);
     } catch (error) {
@@ -309,8 +357,19 @@ const StationDetail = () => {
   };
 
   const fetchAvailableSlots = async (date) => {
-    const response = await bookingsAPI.getAvailableSlots(id, date);
-    setAvailableSlots(response.data);
+    const response = await bookingsAPI.getAvailableSlots(id, date, selectedPort?.id);
+    const slots = response?.data || [];
+    const normalizedSlots = slots.map((entry) => {
+      if (typeof entry === 'string') {
+        return { slot: entry, status: 'available', isBooked: false };
+      }
+      return {
+        slot: entry.slot,
+        status: entry.status || 'available',
+        isBooked: Boolean(entry.isBooked || entry.status === 'booked'),
+      };
+    });
+    setAvailableSlots(normalizedSlots);
   };
 
   const handleDateChange = (e) => {
@@ -318,6 +377,12 @@ const StationDetail = () => {
     setBookingData(prev => ({ ...prev, date, timeSlot: '' }));
     fetchAvailableSlots(date);
   };
+
+  useEffect(() => {
+    if (bookingData.date && showBookingModal) {
+      fetchAvailableSlots(bookingData.date);
+    }
+  }, [selectedPort?.id, bookingData.date, showBookingModal]);
 
   const getAmenityIcon = (amenity) => {
     const icons = {
@@ -374,17 +439,25 @@ const StationDetail = () => {
       station.pricing?.perKwh ??
       0
   );
-  const rawDeliveredKwh = (chargingProgress / 100) * (selectedPortPower > 0 ? selectedPortPower * 0.5 : 20);
-  const maxBillableKwh = selectedPortPrice > 0 ? (50 / selectedPortPrice) : 10;
-  const estimatedSessionKwh = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
-  const estimatedSessionCost = Number(Math.min(50, estimatedSessionKwh * Math.max(selectedPortPrice, 0)).toFixed(2));
+  const maxBillableKwh = selectedPortPrice > 0 ? (ESTIMATED_COST_MAX / selectedPortPrice) : 10;
+  const chargingWindowMinutes = Math.max(15, Number(slotEstimate?.estimatedChargingTime) || 30);
+  const estimatedSessionKwh = Number(
+    Math.max(
+      0.1,
+      Math.min(
+        maxBillableKwh,
+        (chargingWindowMinutes / 60) * Math.max(selectedPortPower || 22, 3) * 0.15
+      )
+    ).toFixed(1)
+  );
+  const estimatedSessionCost = clampEstimatedCost(estimatedSessionKwh * Math.max(selectedPortPrice, 0));
   const progressRatio = Math.min(1, Math.max(0, chargingProgress / 100));
   const deliveredKwh = Number((estimatedSessionKwh * progressRatio).toFixed(1));
   const currentCost = Number((estimatedSessionCost * progressRatio).toFixed(2));
   const minutesLeft = Math.max(0, Math.ceil((100 - chargingProgress) * 0.3));
   const aiEnergyRequired = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
   const aiChargingMinutes = slotEstimate?.estimatedChargingTime || Math.ceil((aiEnergyRequired / Math.max(selectedPortPower || 22, 1)) * 60);
-  const aiEstimatedCost = Number((aiEnergyRequired * aiEffectivePrice).toFixed(2));
+  const aiEstimatedCost = clampEstimatedCost(aiEnergyRequired * Math.max(selectedPortPrice || aiEffectivePrice, 0));
   const aiReportPoints = (aiReport || '')
     .split('\n')
     .map((line) => line.trim().replace(/^[-•*]\s*/, ''))
@@ -398,6 +471,17 @@ const StationDetail = () => {
   const bestTimeLabel = peakStart && peakEnd
     ? `Try before ${peakStart} or after ${peakEnd}`
     : 'Prefer non-peak hours for better cost efficiency';
+  const activeSessionStationName = existingActiveSession?.stationName || 'Unknown Station';
+  const activeSessionPort = existingActiveSession?.portId;
+  const activeSessionStartLabel = existingActiveSession?.startTime
+    ? new Date(existingActiveSession.startTime).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'N/A';
 
   return (
     <div className="space-y-6">
@@ -769,6 +853,22 @@ const StationDetail = () => {
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Start Charging</h2>
             {selectedPort ? (
               <div className="space-y-4">
+                {existingActiveSession && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/user/history')}
+                    className="w-full text-left p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 hover:bg-red-100 transition-colors"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-red-700">
+                      <p className="font-medium">You already have an active charging session.</p>
+                      <p className="mt-1">Station: {activeSessionStationName}</p>
+                      <p>Port: {activeSessionPort ? `#${activeSessionPort}` : 'N/A'}</p>
+                      <p>Started: {activeSessionStartLabel}</p>
+                      <p className="font-medium mt-1">Tap to view session history</p>
+                    </div>
+                  </button>
+                )}
                 <div className="p-3 bg-primary-50 rounded-xl">
                   <p className="text-sm text-secondary-600">Selected Port</p>
                   <p className="font-medium text-secondary-900">
@@ -783,7 +883,7 @@ const StationDetail = () => {
                   fullWidth 
                   icon={Play}
                   onClick={handleStartCharging}
-                  disabled={isCharging}
+                  disabled={isCharging || Boolean(existingActiveSession)}
                 >
                   Start Now
                 </Button>
@@ -844,19 +944,32 @@ const StationDetail = () => {
             <div>
               <label className="input-label">Available Time Slots</label>
               <div className="grid grid-cols-3 gap-2">
-                {availableSlots.map((slot) => (
+                {availableSlots.map((slotInfo) => {
+                  const slot = slotInfo.slot;
+                  const isBooked = Boolean(slotInfo.isBooked);
+                  const isSelected = bookingData.timeSlot === slot;
+                  return (
                   <button
                     key={slot}
-                    onClick={() => setBookingData(prev => ({ ...prev, timeSlot: slot }))}
+                    type="button"
+                    disabled={isBooked}
+                    onClick={() => {
+                      if (!isBooked) {
+                        setBookingData(prev => ({ ...prev, timeSlot: slot }));
+                      }
+                    }}
                     className={`p-2 text-sm rounded-lg border transition-colors ${
-                      bookingData.timeSlot === slot
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-secondary-200 hover:border-primary-300'
+                      isBooked
+                        ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed opacity-90'
+                        : isSelected
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-green-200 bg-green-50 text-green-700 hover:border-green-400'
                     }`}
                   >
                     {slot}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -889,7 +1002,7 @@ const StationDetail = () => {
                 </div>
                 <div className="flex justify-between pt-2 border-t border-secondary-200 mt-2">
                   <span className="font-medium">Estimated Cost</span>
-                  <span className="font-bold text-primary-600">{formatCurrency(15.75)}</span>
+                  <span className="font-bold text-primary-600">{formatCurrency(estimatedSessionCost)}</span>
                 </div>
               </div>
             </div>

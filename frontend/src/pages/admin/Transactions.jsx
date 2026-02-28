@@ -92,8 +92,23 @@ const Transactions = () => {
     showToast({ type: 'success', message: 'Transaction report exported successfully!' });
   };
 
-  const handleRefund = (txn) => {
-    showToast({ type: 'info', message: 'Refund API is not available yet' });
+  const handleRefund = async (txn) => {
+    if (!txn?.id) {
+      showToast({ type: 'error', message: 'Invalid transaction selected' });
+      return;
+    }
+
+    try {
+      const response = await adminAPI.refundTransaction(txn.id);
+      if (response?.success) {
+        showToast({ type: 'success', message: response.message || 'Refund processed successfully' });
+        await fetchTransactions();
+      } else {
+        showToast({ type: 'error', message: response?.error || 'Failed to process refund' });
+      }
+    } catch (error) {
+      showToast({ type: 'error', message: 'Failed to process refund' });
+    }
   };
 
   const getTypeBadge = (type) => {

@@ -6,10 +6,11 @@ class Session:
     
     collection_name = 'sessions'
     
-    def __init__(self, user_id, station_id, port_id, charging_type, payment_method):
+    def __init__(self, user_id, station_id, port_id, charging_type, payment_method, station_name=None):
         self.order_id = f"ORD-{datetime.utcnow().strftime('%Y')}-{ObjectId()}"
         self.user_id = user_id
         self.station_id = station_id
+        self.station_name = station_name
         self.port_id = port_id
         self.start_time = datetime.utcnow()
         self.end_time = None
@@ -32,6 +33,7 @@ class Session:
             'order_id': self.order_id,
             'user_id': self.user_id,
             'station_id': self.station_id,
+            'station_name': self.station_name,
             'port_id': self.port_id,
             'start_time': self.start_time,
             'end_time': self.end_time,
@@ -57,6 +59,7 @@ class Session:
         session.order_id = data.get('order_id')
         session.user_id = data.get('user_id')
         session.station_id = data.get('station_id')
+        session.station_name = data.get('station_name')
         session.port_id = data.get('port_id')
         session.start_time = data.get('start_time')
         session.end_time = data.get('end_time')
@@ -81,6 +84,7 @@ class Session:
             'orderId': self.order_id,
             'userId': str(self.user_id) if self.user_id else None,
             'stationId': str(self.station_id) if self.station_id else None,
+            'stationName': self.station_name,
             'portId': self.port_id,
             'startTime': self.start_time.isoformat() if self.start_time else None,
             'endTime': self.end_time.isoformat() if self.end_time else None,

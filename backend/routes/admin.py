@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from database import get_db
 from models.user import User
 from bson import ObjectId
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from models.booking import Booking
 from models.session import Session
 from models.transaction import Transaction
-from routes.common import to_object_id
+from routes.common import to_object_id, now_utc
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -111,6 +111,13 @@ def require_admin():
     is_admin = user and user.get('role') == 'admin'
     return is_admin, db
 
+
+def _shift_month_start(reference_start, delta_months):
+    month_index = (reference_start.year * 12 + (reference_start.month - 1)) + delta_months
+    year = month_index // 12
+    month = (month_index % 12) + 1
+    return datetime(year, month, 1)
+
 @admin_bp.route('/stats', methods=['GET'])
 @jwt_required()
 def get_admin_stats():
@@ -154,19 +161,36 @@ def get_admin_stats():
         })
         user_growth = ((recent_users - prev_users) / max(prev_users, 1)) * 100
         
-        # Revenue by month
+        # Revenue, energy and users by month (last 6 months, calendar-aligned)
         revenue_by_month = []
-        for i in range(6):
-            start = datetime.utcnow() - timedelta(days=30 * (6 - i))
-            end = datetime.utcnow() - timedelta(days=30 * (5 - i))
+        current_month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        for i in range(5, -1, -1):
+            start = _shift_month_start(current_month_start, -i)
+            end = _shift_month_start(start, 1)
+
             month_trans = db.transactions.find({
                 'timestamp': {'$gte': start, '$lt': end},
-                'type': 'charging'
+                'type': 'charging',
+                'status': 'completed'
             })
-            month_revenue = sum(t.get('amount', 0) for t in month_trans)
+            month_revenue = sum(_to_amount(t.get('amount', 0)) for t in month_trans)
+
+            month_sessions = db.sessions.find({
+                'status': 'completed',
+                'end_time': {'$gte': start, '$lt': end}
+            })
+            month_energy = sum(float(s.get('energy_delivered', 0) or 0) for s in month_sessions)
+
+            month_users = db.users.count_documents({
+                'role': 'user',
+                'created_at': {'$gte': start, '$lt': end}
+            })
+
             revenue_by_month.append({
                 'month': start.strftime('%b'),
-                'revenue': round(month_revenue, 2)
+                'revenue': round(month_revenue, 2),
+                'energy': round(month_energy, 1),
+                'users': int(month_users),
             })
         
         # Stations by city
@@ -228,6 +252,14 @@ def get_admin_stats():
                 'energy': 15.2
             },
             'revenueByMonth': revenue_by_month,
+            'energyByMonth': [
+                {'month': item['month'], 'energy': item['energy']}
+                for item in revenue_by_month
+            ],
+            'userGrowthByMonth': [
+                {'month': item['month'], 'users': item['users']}
+                for item in revenue_by_month
+            ],
             'stationsByCity': stations_by_city,
             'recentActivity': recent_activity
         }
@@ -311,6 +343,68 @@ def get_all_transactions():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@admin_bp.route('/transactions/<transaction_id>/refund', methods=['POST', 'OPTIONS'])
+def refund_transaction(transaction_id):
+    """Refund a completed charging transaction (admin only)"""
+    try:
+        if request.method == 'OPTIONS':
+            return jsonify({'success': True}), 200
+
+        verify_jwt_in_request()
+
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        txn_oid = to_object_id(transaction_id)
+        if not txn_oid:
+            return jsonify({'success': False, 'error': 'Invalid transaction id'}), 400
+
+        transaction = db.transactions.find_one({'_id': txn_oid})
+        if not transaction:
+            return jsonify({'success': False, 'error': 'Transaction not found'}), 404
+
+        if transaction.get('type') != 'charging':
+            return jsonify({'success': False, 'error': 'Only charging transactions can be refunded'}), 400
+
+        if transaction.get('status') != 'completed':
+            return jsonify({'success': False, 'error': 'Only completed transactions can be refunded'}), 400
+
+        existing_refund = db.transactions.find_one({'reference_transaction_id': txn_oid, 'type': 'refund'})
+        if existing_refund:
+            return jsonify({'success': False, 'error': 'Transaction is already refunded'}), 400
+
+        refund_amount = _to_amount(transaction.get('amount'))
+        if refund_amount <= 0:
+            return jsonify({'success': False, 'error': 'Invalid transaction amount for refund'}), 400
+
+        refund_transaction = {
+            'user_id': transaction.get('user_id'),
+            'session_id': transaction.get('session_id'),
+            'amount': refund_amount,
+            'type': 'refund',
+            'payment_method': transaction.get('payment_method', 'Wallet'),
+            'status': 'completed',
+            'description': f"Refund for transaction {str(txn_oid)}",
+            'reference_transaction_id': txn_oid,
+            'timestamp': datetime.utcnow(),
+            'created_at': datetime.utcnow(),
+            'updated_at': now_utc(),
+        }
+
+        db.transactions.insert_one(refund_transaction)
+        db.transactions.update_one(
+            {'_id': txn_oid},
+            {'$set': {'status': 'refunded', 'updated_at': now_utc()}}
+        )
+
+        return jsonify({'success': True, 'message': 'Refund processed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/users', methods=['GET'])
 @jwt_required()
 def get_all_users():
@@ -387,6 +481,49 @@ def update_user_status(user_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@admin_bp.route('/users/<user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    """Delete a user (admin only)"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        user_oid = to_object_id(user_id)
+        if not user_oid:
+            return jsonify({'success': False, 'error': 'Invalid user id'}), 400
+
+        current_admin_id = to_object_id(get_jwt_identity())
+        if current_admin_id and current_admin_id == user_oid:
+            return jsonify({'success': False, 'error': 'You cannot delete your own admin account'}), 400
+
+        target_user = db.users.find_one({'_id': user_oid})
+        if not target_user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        if target_user.get('role') == 'operator':
+            owned_stations = db.stations.count_documents({'operator_id': user_oid})
+            if owned_stations > 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Cannot delete operator with assigned stations. Reassign or remove stations first.'
+                }), 400
+
+        db.users.delete_one({'_id': user_oid})
+
+        db.bookings.delete_many({'user_id': user_oid})
+        db.sessions.delete_many({'user_id': user_oid})
+        db.transactions.delete_many({'user_id': user_oid})
+        db.notifications.delete_many({'user_id': {'$in': [user_oid, str(user_oid)]}})
+
+        return jsonify({'success': True, 'message': 'User deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/stations/<station_id>/status', methods=['PUT'])
 @jwt_required()
 def update_station_status(station_id):
@@ -413,6 +550,41 @@ def update_station_status(station_id):
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         
         return jsonify({'success': True, 'message': 'Station status updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/stations/<station_id>', methods=['DELETE'])
+@jwt_required()
+def delete_station(station_id):
+    """Delete a station (admin only)"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        station = db.stations.find_one({'_id': station_oid})
+        if not station:
+            return jsonify({'success': False, 'error': 'Station not found'}), 404
+
+        active_sessions = db.sessions.count_documents({'station_id': station_oid, 'status': 'active'})
+        if active_sessions > 0:
+            return jsonify({
+                'success': False,
+                'error': 'Cannot delete station with active charging sessions'
+            }), 400
+
+        db.stations.delete_one({'_id': station_oid})
+        db.bookings.delete_many({'station_id': station_oid})
+        db.sessions.delete_many({'station_id': station_oid})
+
+        return jsonify({'success': True, 'message': 'Station deleted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

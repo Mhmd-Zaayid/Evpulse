@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context';
-import { historyAPI, sessionsAPI, bookingsAPI, notificationsAPI } from '../../services';
+import { historyAPI, bookingsAPI, notificationsAPI } from '../../services';
 import { formatCurrency, formatDate, formatDuration, formatEnergy, formatRelativeTime } from '../../utils';
 import { Button, Badge, LoadingSpinner } from '../../components';
 import {
@@ -27,7 +27,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  const [activeSession, setActiveSession] = useState(null);
   const [upcomingBookings, setUpcomingBookings] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -53,16 +52,14 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, activeRes, bookingsRes, historyRes, notifRes] = await Promise.all([
+      const [statsRes, bookingsRes, historyRes, notifRes] = await Promise.all([
         historyAPI.getStats(user?.id),
-        sessionsAPI.getActive(user?.id),
         bookingsAPI.getByUser(user?.id),
         historyAPI.getByUser(user?.id),
         notificationsAPI.getByUser(user?.id),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
-      if (activeRes.success) setActiveSession(activeRes.data);
       if (bookingsRes.success) setUpcomingBookings(bookingsRes.data.filter(b => b.status === 'confirmed'));
       if (historyRes.success) {
         const normalizedSessions = (historyRes.data || []).map((session) => ({
@@ -145,44 +142,6 @@ const Dashboard = () => {
           Find Stations
         </Button>
       </div>
-
-      {/* Active Charging Session Alert */}
-      {activeSession && (
-        <div className="bg-gradient-to-r from-primary-500 to-green-500 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-                <Zap className="w-8 h-8" />
-              </div>
-              <div>
-                <p className="text-white/80 text-sm">Currently Charging</p>
-                <h2 className="text-xl font-bold">GreenCharge Hub - Port #2</h2>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="flex items-center gap-1">
-                    <Battery className="w-4 h-4" />
-                    {activeSession.progress || 68}% Complete
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    ~12 min remaining
-                  </span>
-                </div>
-              </div>
-            </div>
-            <Button variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
-              View Session
-            </Button>
-          </div>
-          <div className="mt-4">
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-white rounded-full transition-all duration-500"
-                style={{ width: `${activeSession.progress || 68}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

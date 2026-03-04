@@ -5,6 +5,7 @@ from models.notification import Notification
 from bson import ObjectId
 from datetime import datetime, time
 from pymongo.errors import DuplicateKeyError
+from utils.charging import calculate_charging_projection
 
 from routes.common import role_required, to_object_id, now_utc
 
@@ -94,18 +95,58 @@ def _refresh_elapsed_bookings(db, station_id=None, date=None, port_id=None):
     if port_id is not None:
         query['port_id'] = _normalize_port_id(port_id)
 
-    active_bookings = list(db.bookings.find(query, {'_id': 1, 'date': 1, 'time_slot': 1}))
-    expired_ids = [
-        booking['_id']
+    active_bookings = list(
+        db.bookings.find(query, {'_id': 1, 'user_id': 1, 'station_id': 1, 'date': 1, 'time_slot': 1})
+    )
+    expired_bookings = [
+        booking
         for booking in active_bookings
         if _slot_has_ended(booking.get('date'), booking.get('time_slot'), now_dt)
     ]
 
-    if expired_ids:
+    if expired_bookings:
+        expired_ids = [booking['_id'] for booking in expired_bookings]
         db.bookings.update_many(
             {'_id': {'$in': expired_ids}},
-            {'$set': {'status': 'completed', 'updated_at': now_utc()}}
+            {'$set': {'status': 'missed_charging', 'updated_at': now_utc()}}
         )
+
+        station_ids = {
+            booking.get('station_id')
+            for booking in expired_bookings
+            if booking.get('station_id') is not None
+        }
+        station_docs = list(db.stations.find({'_id': {'$in': list(station_ids)}}, {'_id': 1, 'name': 1, 'operator_id': 1})) if station_ids else []
+        station_map = {station['_id']: station for station in station_docs}
+
+        for booking in expired_bookings:
+            booking_station = station_map.get(booking.get('station_id'))
+            station_name = (booking_station or {}).get('name') or 'Unknown Station'
+            slot_label = _humanize_slot_label(booking.get('time_slot'))
+
+            _create_notification(
+                db,
+                booking.get('user_id'),
+                'reminder',
+                'Missed Charging',
+                'You have missed your booking.',
+                '/user/bookings'
+            )
+            _create_notification(
+                db,
+                (booking_station or {}).get('operator_id'),
+                'reminder',
+                'Missed Charging Session',
+                f'User missed {slot_label} at {station_name} on {booking.get("date")}.',
+                '/operator/stations'
+            )
+            _notify_admins(
+                db,
+                'reminder',
+                'Missed Charging Session',
+                f'Missed session recorded for {station_name} on {booking.get("date")} ({slot_label}).',
+                '/admin/bookings'
+            )
 
 
 def _create_notification(db, user_id, notification_type, title, message, action_url=None):
@@ -145,6 +186,8 @@ def get_bookings():
         db = g.db
         user = g.current_user
         role = user.get('role')
+
+        _refresh_elapsed_bookings(db)
 
         query = {}
         if role == 'user':
@@ -226,10 +269,23 @@ def create_booking():
         if not station:
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         charging_type = data.get('chargingType', 'Normal AC')
-        
-        # Estimate cost based on slot duration (1 hour)
-        rate = 0.35 if 'fast' in charging_type.lower() else 0.25
-        estimated_cost = round(rate * 30, 2)  # ~30 kWh for 1 hour
+
+        selected_port = None
+        for port in station.get('ports', []):
+            if str(port.get('id')) == str(normalized_port_id):
+                selected_port = port
+                break
+
+        projection = calculate_charging_projection(
+            battery_capacity_kwh=data.get('batteryCapacity', 60),
+            current_percentage=data.get('batteryStart', 20),
+            target_percentage=data.get('batteryTarget', 80),
+            duration_minutes=data.get('durationMinutes', 60),
+            rate_per_kwh=(selected_port or {}).get('price') or station.get('pricing', {}).get('perKwh') or 8,
+            charger_power_kw=(selected_port or {}).get('power') or 22,
+            progress_percentage=100,
+        )
+        estimated_cost = projection['estimatedTotalCost']
         
         booking = Booking(
             user_id=user_id,
@@ -417,6 +473,8 @@ def get_station_bookings(station_id):
             station = db.stations.find_one({'_id': station_oid})
             if not station or station.get('operator_id') != user.get('_id'):
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        _refresh_elapsed_bookings(db, station_id=station_oid)
 
         bookings_data = list(db.bookings.find({'station_id': station_oid}).sort('created_at', -1))
         bookings = _serialize_bookings(bookings_data, db)

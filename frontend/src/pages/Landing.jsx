@@ -11,7 +11,7 @@ const Landing = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Battery className="w-8 h-8" style={{ color: '#c8ff00' }} />
-              <span className="text-2xl font-bold text-white">EvPulse</span>
+              <span className="text-2xl font-bold text-white">EVPulse</span>
             </div>
             <div className="hidden md:flex items-center gap-8 px-8 py-3 rounded-full bg-white/5 backdrop-blur-md border border-white/10 shadow-lg">
               <a href="#home" className="text-white/80 hover:text-white transition-colors text-sm font-medium">Home</a>
@@ -40,17 +40,17 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-6 w-full py-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Center Content */}
-            <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-8 mx-auto mt-20">
-              <div className="space-y-6 text-center">
+            <div className="lg:col-span-6 flex flex-col items-center lg:items-start justify-center space-y-8 mx-auto lg:mx-0">
+              <div className="space-y-6 text-center lg:text-left">
                 <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
                   <div className="text-white">Charge Smarter</div>
                   <div style={{ color: '#c8ff00' }}>Drive Farther</div>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                <p className="text-xl text-gray-300 max-w-2xl mx-auto lg:mx-0">
                   Powering smarter EV charging with one intelligent platform
                 </p>
               </div>
-              <div className="flex justify-center">
+              <div className="flex justify-center lg:justify-start">
                 <Link
                   to="/register"
                   className="px-8 py-4 rounded-lg font-bold text-lg transition-all hover:scale-105 flex items-center gap-2 justify-center whitespace-nowrap shadow-lg"
@@ -63,7 +63,7 @@ const Landing = () => {
 
             {/* Right Side - Charging Station */}
             <div className="lg:col-span-6 flex justify-center lg:justify-end">
-              <div className="relative flex items-center justify-center w-full h-full mt-20">
+              <div className="relative flex items-center justify-center w-full h-full">
                 <img 
                   src="https://ekoenergetyka.com/wp-content/uploads/2024/11/c46ebcb54e12c38e69ecab6aa5eb0986335215209f546097ffd7c25681aa9338.png"
                   alt="EV Charging Station"
@@ -86,7 +86,7 @@ const Landing = () => {
             <div className="md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
                 <Battery className="w-7 h-7" style={{ color: '#c8ff00' }} />
-                <span className="text-xl font-bold text-white">EvPulse</span>
+                <span className="text-xl font-bold text-white">EVPulse</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed">
                 Powering smarter EV charging with one intelligent platform.
@@ -118,10 +118,10 @@ const Landing = () => {
           </div>
           <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-gray-500 text-sm">
-              &copy; {new Date().getFullYear()} EvPulse. All rights reserved.
+              &copy; {new Date().getFullYear()} EVPulse. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-gray-500">
-              <a href="#" className="hover:text-white transition-colors">Twitter</a>
+              <a href="#" className="hover:text-white transition-colors">X</a>
               <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
               <a href="#" className="hover:text-white transition-colors">GitHub</a>
             </div>

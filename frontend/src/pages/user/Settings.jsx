@@ -1,7 +1,11 @@
 import { useState, useRef } from 'react';
 import { useAuth, useNotifications } from '../../context';
+import { authAPI } from '../../services';
 import { Button, Input } from '../../components';
 import { User, Mail, Phone, Car, Bell, Shield, Save, Camera, X } from 'lucide-react';
+
+const MIN_BATTERY_CAPACITY = 30;
+const MAX_BATTERY_CAPACITY = 100;
 
 const Settings = () => {
   const { user, updateUser } = useAuth();
@@ -70,16 +74,46 @@ const Settings = () => {
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      updateUser({
+      const rawBatteryCapacity = String(profileData.batteryCapacity ?? '').trim();
+      let normalizedBatteryCapacity = null;
+
+      if (rawBatteryCapacity) {
+        normalizedBatteryCapacity = Number.parseInt(rawBatteryCapacity, 10);
+        if (
+          Number.isNaN(normalizedBatteryCapacity)
+          || normalizedBatteryCapacity < MIN_BATTERY_CAPACITY
+          || normalizedBatteryCapacity > MAX_BATTERY_CAPACITY
+        ) {
+          showToast({
+            type: 'error',
+            message: `Battery capacity must be between ${MIN_BATTERY_CAPACITY} and ${MAX_BATTERY_CAPACITY} kWh`,
+          });
+          return;
+        }
+      }
+
+      const profilePayload = {
         name: profileData.name,
         phone: profileData.phone,
-        profileImage: profileImage,
         vehicle: {
           make: profileData.vehicleMake,
           model: profileData.vehicleModel,
-          batteryCapacity: parseInt(profileData.batteryCapacity),
         },
+      };
+
+      if (normalizedBatteryCapacity !== null) {
+        profilePayload.vehicle.batteryCapacity = normalizedBatteryCapacity;
+      }
+
+      const response = await authAPI.updateProfile(profilePayload);
+      if (!response?.success || !response?.user) {
+        showToast({ type: 'error', message: response?.error || 'Failed to update profile' });
+        return;
+      }
+
+      updateUser({
+        ...response.user,
+        profileImage: profileImage,
       });
       showToast({ type: 'success', message: 'Profile updated successfully!' });
     } catch (error) {
@@ -109,19 +143,19 @@ const Settings = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="card p-2">
+          <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 ${
                   activeTab === tab.id
-                    ? 'bg-primary-50 text-primary-600'
-                    : 'text-secondary-600 hover:bg-secondary-50'
+                    ? 'bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 shadow-sm border border-emerald-100'
+                    : 'text-secondary-600 hover:bg-gray-50 hover:text-secondary-900'
                 }`}
               >
-                <tab.icon className="w-5 h-5" />
-                <span className="font-medium">{tab.label}</span>
+                <tab.icon className={`w-5 h-5 transition-transform duration-200 ${activeTab === tab.id ? 'scale-110' : ''}`} />
+                <span className="font-medium text-sm">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -130,7 +164,7 @@ const Settings = () => {
         {/* Content */}
         <div className="lg:col-span-3">
           {activeTab === 'profile' && (
-            <div className="card">
+            <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-6 sm:p-8">
               <h2 className="text-lg font-semibold text-secondary-900 mb-6">Profile Information</h2>
               
               {/* Avatar */}
@@ -229,6 +263,9 @@ const Settings = () => {
                   placeholder="e.g., 75"
                   value={profileData.batteryCapacity}
                   onChange={handleProfileChange}
+                  min={MIN_BATTERY_CAPACITY}
+                  max={MAX_BATTERY_CAPACITY}
+                  hint={`${MIN_BATTERY_CAPACITY} to ${MAX_BATTERY_CAPACITY} kWh`}
                 />
               </div>
 
@@ -241,10 +278,10 @@ const Settings = () => {
           )}
 
           {activeTab === 'notifications' && (
-            <div className="card">
+            <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-6 sm:p-8">
               <h2 className="text-lg font-semibold text-secondary-900 mb-6">Notification Preferences</h2>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[
                   { key: 'chargingComplete', label: 'Charging Complete', desc: 'Get notified when your vehicle is fully charged' },
                   { key: 'bookingReminder', label: 'Booking Reminders', desc: 'Receive reminders before your scheduled charging slot' },
@@ -252,15 +289,15 @@ const Settings = () => {
                   { key: 'priceAlerts', label: 'Price Alerts', desc: 'Receive alerts about pricing changes and peak hours' },
                   { key: 'promotions', label: 'Promotions & Offers', desc: 'Stay updated with special offers and discounts' },
                 ].map((item) => (
-                  <div key={item.key} className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+                  <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
                     <div>
-                      <p className="font-medium text-secondary-900">{item.label}</p>
-                      <p className="text-sm text-secondary-500">{item.desc}</p>
+                      <p className="font-medium text-secondary-900 text-sm">{item.label}</p>
+                      <p className="text-sm text-secondary-500 mt-0.5">{item.desc}</p>
                     </div>
                     <button
                       onClick={() => handleNotificationChange(item.key)}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        notifications[item.key] ? 'bg-primary-500' : 'bg-secondary-300'
+                      className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                        notifications[item.key] ? 'bg-emerald-500 shadow-md shadow-emerald-500/30' : 'bg-secondary-300'
                       }`}
                     >
                       <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
@@ -274,7 +311,7 @@ const Settings = () => {
           )}
 
           {activeTab === 'security' && (
-            <div className="card">
+            <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-6 sm:p-8">
               <h2 className="text-lg font-semibold text-secondary-900 mb-6">Security Settings</h2>
               
               <div className="space-y-6">

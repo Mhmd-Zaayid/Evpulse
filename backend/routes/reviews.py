@@ -41,6 +41,19 @@ def create_review():
         
         user_id = get_jwt_identity()
         data = request.get_json()
+
+        station_id = to_object_id((data or {}).get('stationId'))
+        if not station_id:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        raw_rating = (data or {}).get('rating')
+        try:
+            rating = int(raw_rating)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Rating must be an integer between 1 and 5'}), 400
+
+        if rating < 1 or rating > 5:
+            return jsonify({'success': False, 'error': 'Rating must be between 1 and 5'}), 400
         
         # Get user info
         user = db.users.find_one({'_id': ObjectId(user_id)})
@@ -49,7 +62,7 @@ def create_review():
         
         # Check if user already reviewed this station
         existing = db.reviews.find_one({
-            'station_id': to_object_id(data['stationId']),
+            'station_id': station_id,
             'user_id': to_object_id(user_id)
         })
         
@@ -57,10 +70,10 @@ def create_review():
             return jsonify({'success': False, 'error': 'You have already reviewed this station'}), 400
         
         review = Review(
-            station_id=to_object_id(data['stationId']),
+            station_id=station_id,
             user_id=to_object_id(user_id),
             user_name=user['name'],
-            rating=data['rating'],
+            rating=rating,
             comment=data.get('comment', '')
         )
         
@@ -68,7 +81,7 @@ def create_review():
         review.id = str(result.inserted_id)
         
         # Update station rating
-        _update_station_rating(station_id=to_object_id(data['stationId']))
+        _update_station_rating(station_id=station_id)
         
         return jsonify({'success': True, 'data': review.to_response_dict()}), 201
     except Exception as e:

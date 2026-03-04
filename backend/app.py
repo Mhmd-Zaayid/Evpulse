@@ -12,6 +12,7 @@ import requests
 import json
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from utils.charging import calculate_charging_projection
 
 # Configure logging
 logging.basicConfig(
@@ -264,12 +265,29 @@ def _register_routes(app: Flask) -> None:
             # Build a simple prompt from provided params (keep concise)
             vehicleType = body.get('vehicleType', 'Car')
             batteryCapacity = body.get('batteryCapacity', 60)
+            try:
+                batteryCapacity = int(batteryCapacity)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'Battery capacity must be an integer between 25 and 100 kWh.'}), 400
+            if batteryCapacity < 25 or batteryCapacity > 100:
+                return jsonify({'success': False, 'error': 'Battery capacity must be between 25 and 100 kWh.'}), 400
             currentPercentage = body.get('currentPercentage', 35)
             targetPercentage = body.get('targetPercentage', 80)
             chargerType = body.get('chargerType', 'Fast')
             chargerPower = body.get('chargerPower', 150)
             costPerKwh = body.get('costPerKwh', 8)
+            selectedDurationMinutes = body.get('durationMinutes', 60)
             peakHours = body.get('peakHours', '6 PM – 10 PM')
+
+            projection = calculate_charging_projection(
+                battery_capacity_kwh=batteryCapacity,
+                current_percentage=currentPercentage,
+                target_percentage=targetPercentage,
+                duration_minutes=selectedDurationMinutes,
+                rate_per_kwh=costPerKwh,
+                charger_power_kw=chargerPower,
+                progress_percentage=100,
+            )
 
             prompt = f"""You are an advanced AI-powered EV Charging Optimization Engine.
 
@@ -280,7 +298,13 @@ Target Battery Level (%): {targetPercentage}
 Charger Type: {chargerType}
 Charger Power Output (kW): {chargerPower}
 Electricity Cost per kWh (₹): {costPerKwh}
+Selected Charging Duration (minutes): {projection['durationMinutes']}
 Peak Hours: {peakHours}
+
+Deterministic projection (must be used as the baseline in your response):
+- Energy Required (kWh): {projection['targetEnergyKwh']}
+- Estimated Charging Time (minutes): {projection['durationMinutes']}
+- Estimated Cost (₹): {projection['estimatedTotalCost']}
 
 Analyze the above and provide a clear, well-formatted charging optimization report. Include:
 1. Energy Required (kWh)
@@ -331,7 +355,13 @@ Keep it concise, professional, and easy to read. Use plain text with clear headi
                 return jsonify({'success': False, 'error': 'No content returned from AI service.'}), 502
 
             # Return raw text directly — no JSON parsing needed
-            return jsonify({'success': True, 'data': {'text': textContent}})
+            return jsonify({
+                'success': True,
+                'data': {
+                    'text': textContent,
+                    'projection': projection,
+                }
+            })
 
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500

@@ -1,3 +1,17 @@
+const normalizeDateInput = (date) => {
+  if (!date) return null;
+  if (date instanceof Date) return date;
+
+  if (typeof date === 'string') {
+    const trimmed = date.trim();
+    const hasTimezone = /([zZ]|[+\-]\d{2}:?\d{2})$/.test(trimmed);
+    const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+    return new Date(normalized);
+  }
+
+  return new Date(date);
+};
+
 // Format currency
 export const formatCurrency = (amount, currency = 'INR') => {
   const num = Number(amount) || 0;
@@ -15,7 +29,7 @@ export const formatNumber = (number) => {
 // Format date
 export const formatDate = (date, options = {}) => {
   if (!date) return 'N/A';
-  const parsed = new Date(date);
+  const parsed = normalizeDateInput(date);
   if (isNaN(parsed.getTime())) return 'N/A';
   const defaultOptions = {
     year: 'numeric',
@@ -28,7 +42,7 @@ export const formatDate = (date, options = {}) => {
 // Format time
 export const formatTime = (date) => {
   if (!date) return 'N/A';
-  const parsed = new Date(date);
+  const parsed = normalizeDateInput(date);
   if (isNaN(parsed.getTime())) return 'N/A';
   return parsed.toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -46,9 +60,16 @@ export const formatDateTime = (date) => {
 
 // Format relative time
 export const formatRelativeTime = (date) => {
+  if (!date) return 'Just now';
+
   const now = new Date();
-  const past = new Date(date);
-  const diffInSeconds = Math.floor((now - past) / 1000);
+  const past = normalizeDateInput(date);
+  if (Number.isNaN(past.getTime())) {
+    return 'Just now';
+  }
+
+  const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
+  if (diffInSeconds < 0) return 'Just now';
   
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) {
@@ -158,6 +179,54 @@ export const calculateChargingCost = (energy, pricePerKwh) => {
   return energy * pricePerKwh;
 };
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+export const MIN_WALLET_BALANCE = 100;
+
+export const calculateChargingProjection = ({
+  batteryCapacity = 60,
+  currentBattery = 20,
+  targetBattery = 80,
+  durationMinutes = 60,
+  pricePerKwh = 8,
+  chargerPowerKw = 22,
+  progress = 100,
+} = {}) => {
+  const normalizedBatteryCapacity = clamp(Number(batteryCapacity) || 60, 25, 100);
+  const normalizedCurrent = clamp(Number(currentBattery) || 0, 0, 100);
+  const normalizedTarget = clamp(Number(targetBattery) || 80, normalizedCurrent, 100);
+  const normalizedDuration = clamp(Math.round(Number(durationMinutes) || 60), 15, 240);
+  const normalizedRate = Math.max(0.1, Number(pricePerKwh) || 8);
+  const normalizedPower = clamp(Number(chargerPowerKw) || 22, 3, 350);
+  const normalizedProgress = clamp(Number(progress) || 0, 0, 100);
+
+  const requestedEnergy = (normalizedBatteryCapacity * (normalizedTarget - normalizedCurrent)) / 100;
+  const durationLimitedEnergy = normalizedPower * (normalizedDuration / 60) * 0.9;
+  const projectedEnergy = Math.max(
+    0,
+    Math.min(requestedEnergy > 0 ? requestedEnergy : durationLimitedEnergy, durationLimitedEnergy)
+  );
+
+  const projectedCost = projectedEnergy * normalizedRate;
+  const deliveredRatio = normalizedProgress / 100;
+  const deliveredEnergyKwh = projectedEnergy * deliveredRatio;
+  const deliveredCost = deliveredEnergyKwh * normalizedRate;
+
+  return {
+    batteryCapacity: Number(normalizedBatteryCapacity.toFixed(1)),
+    currentBattery: Number(normalizedCurrent.toFixed(1)),
+    targetBattery: Number(normalizedTarget.toFixed(1)),
+    durationMinutes: normalizedDuration,
+    pricePerKwh: Number(normalizedRate.toFixed(2)),
+    chargerPowerKw: Number(normalizedPower.toFixed(1)),
+    targetEnergyKwh: Number(projectedEnergy.toFixed(1)),
+    estimatedCost: Number(projectedCost.toFixed(2)),
+    deliveredEnergyKwh: Number(deliveredEnergyKwh.toFixed(1)),
+    deliveredCost: Number(deliveredCost.toFixed(2)),
+    progress: Number(normalizedProgress.toFixed(1)),
+  };
+};
+
 // Get status color class
 export const getStatusColor = (status) => {
   const colors = {
@@ -169,6 +238,7 @@ export const getStatusColor = (status) => {
     pending: 'badge-warning',
     confirmed: 'badge-success',
     cancelled: 'badge-danger',
+    missed_charging: 'badge-danger',
   };
   return colors[status] || 'badge-info';
 };
@@ -184,6 +254,7 @@ export const getStatusText = (status) => {
     pending: 'Pending',
     confirmed: 'Confirmed',
     cancelled: 'Cancelled',
+    missed_charging: 'Missed Charging',
   };
   return texts[status] || status;
 };

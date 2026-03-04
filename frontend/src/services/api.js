@@ -391,6 +391,17 @@ export const adminAPI = {
     }
   },
 
+  async updateStation(stationId, stationData) {
+    try {
+      return await apiRequest(`/admin/stations/${stationId}`, {
+        method: 'PUT',
+        body: JSON.stringify(stationData),
+      });
+    } catch (error) {
+      return safeError(error);
+    }
+  },
+
   async deleteStation(stationId) {
     try {
       return await apiRequest(`/admin/stations/${stationId}`, {
@@ -403,9 +414,11 @@ export const adminAPI = {
 };
 
 export const operatorAPI = {
-  async getStats() {
+  async getStats(range = 'month') {
     try {
-      const response = await apiRequest('/operator/stats');
+      const params = new URLSearchParams();
+      if (range) params.append('range', range);
+      const response = await apiRequest(`/operator/stats${params.toString() ? `?${params.toString()}` : ''}`);
       return response.data || {};
     } catch (error) {
       return {};
@@ -477,8 +490,8 @@ export const operatorAPI = {
           userName: review.userName || 'User',
           rating: review.rating || 0,
           comment: review.comment || '',
-          createdAt: review.date || null,
-          status: 'pending',
+          date: review.date || review.createdAt || review.timestamp || null,
+          createdAt: review.date || review.createdAt || review.timestamp || null,
         }))
       );
 
@@ -496,8 +509,7 @@ export const operatorAPI = {
           totalReviews,
           thisMonthReviews: reviews.length,
           positiveReviews,
-          resolvedIssues: 0,
-          pendingIssues: reviews.length,
+          issueReports: reviews.length,
           ratingDistribution,
         },
         reviews,
@@ -505,7 +517,7 @@ export const operatorAPI = {
       };
     } catch (error) {
       return {
-        stats: { averageRating: 0, totalReviews: 0, thisMonthReviews: 0, positiveReviews: 0, resolvedIssues: 0, pendingIssues: 0, ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } },
+        stats: { averageRating: 0, totalReviews: 0, thisMonthReviews: 0, positiveReviews: 0, issueReports: 0, ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } },
         reviews: [],
         ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
       };
@@ -648,7 +660,7 @@ export const adminFeedbackAPI = {
         ...review,
         stationName: review.stationName || review.stationId,
         operatorName: review.operatorName || stationOperatorMap[review.stationId] || 'Unknown Operator',
-        status: review.status || 'pending',
+        date: review.timestamp || review.createdAt || review.date || null,
         createdAt: review.timestamp,
       }));
 
@@ -657,7 +669,6 @@ export const adminFeedbackAPI = {
           platformRating: stats.averageRating || 0,
           totalReviews: stats.totalReviews || 0,
           thisWeekReviews: stats.reviewsThisMonth || 0,
-          pendingReviews: normalizedReviews.filter((r) => (r.status || '') === 'pending').length,
           flaggedReviews: normalizedReviews.filter((r) => (r.rating || 0) <= 2).length,
           satisfactionRate: stats.averageRating ? Math.min(100, Math.round((stats.averageRating / 5) * 100)) : 0,
         },
@@ -667,7 +678,7 @@ export const adminFeedbackAPI = {
       };
     } catch (error) {
       return {
-        stats: { platformRating: 0, totalReviews: 0, thisWeekReviews: 0, pendingReviews: 0, flaggedReviews: 0, satisfactionRate: 0 },
+        stats: { platformRating: 0, totalReviews: 0, thisWeekReviews: 0, flaggedReviews: 0, satisfactionRate: 0 },
         topStations: [],
         lowRatedStations: [],
         reviews: [],

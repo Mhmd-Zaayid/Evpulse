@@ -83,7 +83,7 @@ const Login = () => {
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-3">
             <Battery className="w-8 h-8" style={{ color: '#c8ff00' }} />
-            <span className="text-2xl font-bold text-white">EvPulse</span>
+            <span className="text-2xl font-bold text-white">EVPulse</span>
           </Link>
         </div>
         
@@ -121,7 +121,7 @@ const Login = () => {
         {/* Footer */}
         <div className="relative z-10">
           <p className="text-white/40 text-xs">
-            &copy; {new Date().getFullYear()} EvPulse. All rights reserved.
+            &copy; {new Date().getFullYear()} EVPulse. All rights reserved.
           </p>
         </div>
       </div>
@@ -132,7 +132,7 @@ const Login = () => {
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
             <Battery className="w-8 h-8 text-emerald-600" />
-            <span className="text-2xl font-bold text-gray-900">EvPulse</span>
+            <span className="text-2xl font-bold text-gray-900">EVPulse</span>
           </div>
 
           {/* Header */}

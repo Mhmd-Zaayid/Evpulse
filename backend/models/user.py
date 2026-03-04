@@ -21,6 +21,7 @@ class User:
         self.department = department  # For admins
         self.joined_date = datetime.utcnow()
         self.is_active = True
+        self.status = 'active'
         self.created_at = datetime.utcnow()
         self.updated_at = datetime.utcnow()
     
@@ -49,6 +50,7 @@ class User:
             'department': self.department,
             'joined_date': self.joined_date,
             'is_active': self.is_active,
+            'status': self.status,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -70,6 +72,7 @@ class User:
         user.department = data.get('department')
         user.joined_date = data.get('joined_date')
         user.is_active = data.get('is_active', True)
+        user.status = data.get('status') or ('active' if user.is_active else 'inactive')
         user.created_at = data.get('created_at')
         user.updated_at = data.get('updated_at')
         return user
@@ -88,5 +91,6 @@ class User:
             'stations': self.stations,
             'department': self.department,
             'joinedDate': self.joined_date.isoformat() if self.joined_date else None,
-            'isActive': self.is_active
+            'isActive': self.is_active,
+            'status': self.status
         }

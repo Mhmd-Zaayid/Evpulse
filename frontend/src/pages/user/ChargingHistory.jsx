@@ -295,7 +295,7 @@ const ChargingHistory = () => {
                       {session.rating ? (
                         renderStars(session.rating)
                       ) : (
-                        <Badge variant="warning">Not Rated</Badge>
+                        <span className="text-sm font-medium text-green-600">Success</span>
                       )}
                     </div>
                     <ChevronRight className="w-5 h-5 text-secondary-400" />

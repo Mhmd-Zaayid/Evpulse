@@ -52,6 +52,7 @@ const Stations = () => {
   const [editData, setEditData] = useState({
     name: '',
     address: '',
+    city: '',
     operatingHours: '',
     image: '',
     status: '',
@@ -186,6 +187,7 @@ const Stations = () => {
     setEditData({
       name: station?.name || '',
       address: station?.nearbyLandmark || station?.nearby_landmark || station?.address || '',
+      city: station?.city || station?.location?.city || '',
       operatingHours: station?.operatingHours || '',
       image: station?.image || '',
       status: station?.status || 'available',
@@ -225,6 +227,7 @@ const Stations = () => {
         name: editData.name?.trim(),
         address: editData.address?.trim(),
         nearbyLandmark: editData.address?.trim(),
+        city: editData.city?.trim(),
         operating_hours: editData.operatingHours?.trim() || '24/7',
         status: editData.status,
         image: editData.image?.trim() || null,
@@ -254,7 +257,23 @@ const Stations = () => {
 
   const handleSavePricing = async () => {
     try {
-      await operatorAPI.updatePricing(selectedStation.id, pricingData);
+      const normalBase = Number(pricingData.normalBase) || 0;
+      const normalPeak = Number(pricingData.normalPeak) || normalBase;
+      const fastBase = Number(pricingData.fastBase) || normalBase;
+      const fastPeak = Number(pricingData.fastPeak) || fastBase;
+
+      const payload = {
+        pricing: {
+          normal: { base: normalBase, peak: normalPeak },
+          fast: { base: fastBase, peak: fastPeak },
+        },
+        peakHours: {
+          start: pricingData.peakStart || '18:00',
+          end: pricingData.peakEnd || '22:00',
+        },
+      };
+
+      await operatorAPI.updatePricing(selectedStation.id, payload);
       showToast({ type: 'success', message: 'Pricing updated successfully!' });
       setShowPricingModal(false);
       fetchStations();
@@ -633,6 +652,7 @@ const Stations = () => {
           setEditData({
             name: '',
             address: '',
+            city: '',
             operatingHours: '',
             image: '',
             status: '',
@@ -651,6 +671,12 @@ const Stations = () => {
             label="Address"
             value={editData.address}
             onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
+          />
+          <Input
+            label="City"
+            value={editData.city}
+            onChange={(e) => setEditData(prev => ({ ...prev, city: e.target.value }))}
+            placeholder="Enter city"
           />
           <Input
             label="Operating Hours"
@@ -691,6 +717,7 @@ const Stations = () => {
               setEditData({
                 name: '',
                 address: '',
+                city: '',
                 operatingHours: '',
                 status: '',
               });

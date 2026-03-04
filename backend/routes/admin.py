@@ -538,11 +538,37 @@ def get_all_stations():
         stations = [Station.from_dict(data).to_response_dict() for data in stations_data]
         operator_name_map = _build_user_name_map(db, [station.get('operatorId') for station in stations])
 
+        station_ids = [to_object_id(station.get('id')) for station in stations if to_object_id(station.get('id'))]
+        session_docs = list(db.sessions.find(
+            {
+                'station_id': {'$in': station_ids},
+                'status': 'completed'
+            },
+            {
+                'station_id': 1,
+                'cost': 1,
+                'total_cost': 1
+            }
+        )) if station_ids else []
+
+        station_financials = {}
+        for session in session_docs:
+            station_key = str(session.get('station_id')) if session.get('station_id') else None
+            if not station_key:
+                continue
+            if station_key not in station_financials:
+                station_financials[station_key] = {'revenue': 0.0, 'sessions': 0}
+            station_financials[station_key]['revenue'] += _to_amount(session.get('cost') or session.get('total_cost'))
+            station_financials[station_key]['sessions'] += 1
+
         for station in stations:
+            station_finance = station_financials.get(station.get('id'), {'revenue': 0.0, 'sessions': 0})
             station['operatorName'] = operator_name_map.get(
                 station.get('operatorId'),
                 'Unknown Operator'
             )
+            station['revenue'] = round(station_finance['revenue'], 2)
+            station['totalSessions'] = int(station_finance['sessions'])
         
         return jsonify({'success': True, 'data': stations})
     except Exception as e:
@@ -559,12 +585,16 @@ def update_user_status(user_id):
         if not is_admin:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
         
-        data = request.get_json()
-        status = data.get('status')
+        data = request.get_json() or {}
+        status = str(data.get('status') or '').strip().lower()
+        if status not in {'active', 'inactive', 'suspended', 'pending'}:
+            return jsonify({'success': False, 'error': 'Invalid status'}), 400
+
+        is_active = status == 'active'
         
         result = db.users.update_one(
             {'_id': ObjectId(user_id)},
-            {'$set': {'is_active': status == 'active', 'updated_at': datetime.utcnow()}}
+            {'$set': {'is_active': is_active, 'status': status, 'updated_at': datetime.utcnow()}}
         )
         
         if result.modified_count == 0:
@@ -643,6 +673,72 @@ def update_station_status(station_id):
             return jsonify({'success': False, 'error': 'Station not found'}), 404
         
         return jsonify({'success': True, 'message': 'Station status updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/stations/<station_id>', methods=['PUT'])
+@jwt_required()
+def update_station(station_id):
+    """Update station details (admin only)"""
+    try:
+        is_admin, db = require_admin()
+        if db is None:
+            return jsonify(DB_UNAVAILABLE), 503
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        station_oid = to_object_id(station_id)
+        if not station_oid:
+            return jsonify({'success': False, 'error': 'Invalid station id'}), 400
+
+        station = db.stations.find_one({'_id': station_oid})
+        if not station:
+            return jsonify({'success': False, 'error': 'Station not found'}), 404
+
+        data = request.get_json() or {}
+        update_data = {}
+
+        if 'name' in data:
+            update_data['name'] = str(data.get('name') or '').strip()
+
+        if 'status' in data:
+            status_value = str(data.get('status') or '').strip().lower()
+            if status_value not in ['available', 'busy', 'offline']:
+                return jsonify({'success': False, 'error': 'Invalid status'}), 400
+            update_data['status'] = status_value
+
+        if 'operatorId' in data:
+            operator_oid = to_object_id(data.get('operatorId'))
+            if not operator_oid:
+                return jsonify({'success': False, 'error': 'Invalid operator id'}), 400
+
+            operator_user = db.users.find_one({'_id': operator_oid})
+            if not operator_user or operator_user.get('role') not in ['operator', 'admin']:
+                return jsonify({'success': False, 'error': 'Operator not found'}), 404
+
+            update_data['operator_id'] = operator_oid
+
+        if 'nearbyLandmark' in data or 'address' in data:
+            nearby_landmark = str(data.get('nearbyLandmark') or data.get('address') or '').strip()
+            update_data['nearby_landmark'] = nearby_landmark
+            if 'address' in data:
+                update_data['address'] = nearby_landmark
+
+        if 'image' in data:
+            image_value = str(data.get('image') or '').strip()
+            update_data['image'] = image_value or None
+
+        if not update_data:
+            return jsonify({'success': False, 'error': 'No valid fields provided for update'}), 400
+
+        update_data['updated_at'] = now_utc()
+        db.stations.update_one({'_id': station_oid}, {'$set': update_data})
+
+        updated_station = db.stations.find_one({'_id': station_oid})
+        from models.station import Station
+        station_response = Station.from_dict(updated_station).to_response_dict()
+        return jsonify({'success': True, 'data': station_response, 'message': 'Station updated successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth, useNotifications } from '../../context';
 import { operatorAPI } from '../../services';
-import { formatCurrency, formatEnergy, formatDate } from '../../utils';
+import { formatCurrency, formatEnergy } from '../../utils';
 import { Button, Select, LoadingSpinner } from '../../components';
 import {
   LineChart,
@@ -35,13 +35,15 @@ const Reports = () => {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    fetchStats();
+    fetchStats(dateRange);
+    const intervalId = setInterval(() => fetchStats(dateRange), 15000);
+    return () => clearInterval(intervalId);
   }, [dateRange]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (range) => {
     setLoading(true);
     try {
-      const response = await operatorAPI.getStats(user.id);
+      const response = await operatorAPI.getStats(range);
       setStats(response);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -73,7 +75,7 @@ const Reports = () => {
     },
     {
       label: 'Total Sessions',
-      value: String((stats?.sessionsByHour || []).reduce((sum, point) => sum + (point.sessions || 0), 0)),
+      value: String(stats?.totalSessions || 0),
       change: '-',
       trend: 'up',
       icon: Users,
@@ -92,12 +94,15 @@ const Reports = () => {
   const revenueData = (stats?.revenueByStation || []).map((item) => ({
     date: item.station,
     revenue: item.revenue,
-    sessions: 0,
+    sessions: item.sessions || 0,
   }));
 
-  const utilizationData = (stats?.revenueByStation || []).map((item) => ({
+  const utilizationData = (stats?.stationUtilization || []).map((item) => ({
     name: item.station,
-    utilization: stats?.portUtilization || 0,
+    utilization: item.utilization || 0,
+    totalSlots: item.totalSlots || 0,
+    bookedSlots: item.bookedSlots || 0,
+    availableSlots: item.availableSlots || 0,
   }));
 
   const peakHoursData = stats?.sessionsByHour || [];
@@ -248,6 +253,9 @@ const Reports = () => {
                   <span className="text-sm font-medium text-secondary-700">{station.name}</span>
                   <span className="text-sm font-semibold text-secondary-900">{station.utilization}%</span>
                 </div>
+                <p className="text-xs text-secondary-500 mb-2">
+                  {station.bookedSlots}/{station.totalSlots} booked • {station.availableSlots} available
+                </p>
                 <div className="h-3 bg-secondary-100 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all ${

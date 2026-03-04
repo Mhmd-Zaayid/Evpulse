@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import math
 from models.transaction import Transaction
 from pymongo.errors import DuplicateKeyError
+from utils.charging import calculate_charging_projection, MIN_WALLET_BALANCE_INR
 
 from routes.common import role_required, to_object_id, now_utc
 
@@ -103,6 +104,23 @@ def _to_amount(value):
         return 0.0
 
 
+def _build_user_match(user_id):
+    user_oid = to_object_id(user_id)
+    candidates = []
+    seen = set()
+
+    for value in [user_id, str(user_id) if user_id is not None else None, user_oid, str(user_oid) if user_oid else None]:
+        if value is None:
+            continue
+        key = f"{type(value).__name__}:{value}"
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(value)
+
+    return {'$in': candidates}
+
+
 def _resolve_transaction_amount(db, transaction):
     amount = _to_amount(transaction.get('amount'))
     if amount > 0:
@@ -122,14 +140,14 @@ def _resolve_transaction_amount(db, transaction):
 
 def _get_wallet_balance(db, user_id):
     topups = list(db.transactions.find({
-        'user_id': user_id,
+        'user_id': _build_user_match(user_id),
         'type': 'wallet_topup',
         'status': 'completed'
     }))
 
     wallet_payments = list(db.transactions.find({
-        'user_id': user_id,
-        'payment_method': 'Wallet',
+        'user_id': _build_user_match(user_id),
+        'payment_method': {'$regex': '^wallet$', '$options': 'i'},
         'type': 'charging',
         'status': 'completed'
     }))
@@ -254,16 +272,35 @@ def start_session():
         payment_method = data.get('paymentMethod', 'Wallet')
         if str(payment_method).lower() == 'wallet':
             wallet_balance = _get_wallet_balance(db, user_id)
-            if wallet_balance <= 0:
+            if wallet_balance < MIN_WALLET_BALANCE_INR:
                 return jsonify({
                     'success': False,
-                    'error': 'Insufficient wallet balance'
+                    'error': f'Minimum wallet balance must be ₹{int(MIN_WALLET_BALANCE_INR)} to start charging.'
                 }), 400
 
         # Update port status to busy
         db.stations.update_one(
             {'_id': station_id, 'ports.id': data['portId']},
             {'$set': {'ports.$.status': 'busy'}}
+        )
+
+        selected_port = None
+        for port in station.get('ports', []):
+            if str(port.get('id')) == str(data.get('portId')):
+                selected_port = port
+                break
+
+        price_per_kwh = float((selected_port or {}).get('price') or 8.0)
+        charger_power_kw = float((selected_port or {}).get('power') or 22.0)
+
+        projection = calculate_charging_projection(
+            battery_capacity_kwh=data.get('batteryCapacity', 60),
+            current_percentage=data.get('batteryStart', 20),
+            target_percentage=data.get('batteryTarget', 80),
+            duration_minutes=data.get('durationMinutes', 60),
+            rate_per_kwh=price_per_kwh,
+            charger_power_kw=charger_power_kw,
+            progress_percentage=100,
         )
         
         # Create new session
@@ -275,13 +312,24 @@ def start_session():
             payment_method=payment_method,
             station_name=station.get('name')
         )
-        session.battery_start = data.get('batteryStart', 20)
-        session.estimated_completion = now_utc() + timedelta(minutes=45)
+        session.battery_start = projection['currentPercentage']
+        session.battery_end = projection['targetPercentage']
+        session.estimated_completion = now_utc() + timedelta(minutes=projection['durationMinutes'])
         session.created_at = now_utc()
         session.updated_at = now_utc()
         
+        session_payload = session.to_dict()
+        session_payload.update({
+            'battery_capacity_kwh': projection['batteryCapacityKwh'],
+            'planned_duration_minutes': projection['durationMinutes'],
+            'price_per_kwh': projection['ratePerKwh'],
+            'charger_power_kw': projection['chargerPowerKw'],
+            'target_energy_kwh': projection['targetEnergyKwh'],
+            'estimated_cost': projection['estimatedTotalCost'],
+        })
+
         try:
-            result = db.sessions.insert_one(session.to_dict())
+            result = db.sessions.insert_one(session_payload)
         except DuplicateKeyError:
             return jsonify({
                 'success': False,
@@ -360,25 +408,28 @@ def stop_session(session_id):
                 selected_port = port
                 break
 
-        energy_rate = float((selected_port or {}).get('price') or 8.0)
-        charger_power_kw = float((selected_port or {}).get('power') or 22.0)
-        charger_power_kw = max(3.0, charger_power_kw)
+        progress_percentage = _to_number(payload.get('progress'))
+        if progress_percentage is None:
+            planned_duration = _to_number(session_data.get('planned_duration_minutes')) or duration_minutes
+            progress_percentage = min(100.0, max(0.0, (duration_minutes / max(1.0, planned_duration)) * 100.0))
 
-        # Prefer client telemetry when provided; otherwise estimate conservatively
-        requested_energy = _to_number(payload.get('energyDelivered'))
-        if requested_energy is not None and requested_energy > 0:
-            energy_delivered = round(float(requested_energy), 1)
-        else:
-            estimated_energy = (duration_minutes / 60.0) * charger_power_kw * 0.15
-            energy_delivered = round(max(0.1, estimated_energy), 1)
+        projection = calculate_charging_projection(
+            battery_capacity_kwh=session_data.get('battery_capacity_kwh') or payload.get('batteryCapacity') or 60,
+            current_percentage=session_data.get('battery_start') or payload.get('batteryStart') or 20,
+            target_percentage=session_data.get('battery_end') or payload.get('batteryTarget') or 80,
+            duration_minutes=session_data.get('planned_duration_minutes') or duration_minutes,
+            rate_per_kwh=(selected_port or {}).get('price') or session_data.get('price_per_kwh') or 8.0,
+            charger_power_kw=(selected_port or {}).get('power') or session_data.get('charger_power_kw') or 22.0,
+            progress_percentage=progress_percentage,
+        )
 
-        requested_cost = _to_number(payload.get('totalCost'))
-        if requested_cost is not None and requested_cost >= 0:
-            total_cost = float(requested_cost)
-        else:
-            total_cost = energy_delivered * energy_rate
-
-        total_cost = round(max(0.0, total_cost), 2)
+        energy_delivered = projection['deliveredEnergyKwh']
+        total_cost = projection['deliveredCost']
+        battery_start = projection['currentPercentage']
+        battery_end = round(
+            battery_start + (projection['targetPercentage'] - battery_start) * (projection['progressPercentage'] / 100.0),
+            1,
+        )
         
         # Update session
         db.sessions.update_one(
@@ -390,7 +441,13 @@ def stop_session(session_id):
                 'energy_delivered': energy_delivered,
                 'cost': total_cost,
                 'total_cost': total_cost,
-                'progress': 100,
+                'progress': projection['progressPercentage'],
+                'battery_start': battery_start,
+                'battery_end': battery_end,
+                'target_energy_kwh': projection['targetEnergyKwh'],
+                'estimated_cost': projection['estimatedTotalCost'],
+                'price_per_kwh': projection['ratePerKwh'],
+                'charger_power_kw': projection['chargerPowerKw'],
                 'updated_at': now_utc()
             }}
         )

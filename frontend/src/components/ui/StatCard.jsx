@@ -53,7 +53,7 @@ const StatCard = ({
   }
 
   return (
-    <div className={`rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 p-6 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 hover:scale-[1.02] ${className}`}>
+    <div className={`rounded-2xl shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 p-6 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 hover:scale-[1.03] ${className}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">{title}</p>
@@ -74,8 +74,8 @@ const StatCard = ({
         </div>
         
         {Icon && (
-          <div className={`p-3 rounded-xl ${iconBg} bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30`}>
-            <Icon className="w-6 h-6 text-green-900" />
+          <div className={`p-4 rounded-xl ${iconBg} bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30`}>
+            <Icon className="w-8 h-8 text-green-900" />
           </div>
         )}
       </div>

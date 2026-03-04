@@ -306,21 +306,21 @@ const Settings = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-secondary-900 mb-4">Alert Channels</h3>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[
             { key: 'emailAlerts', label: 'Email Alerts', desc: 'Receive alerts via email' },
             { key: 'smsAlerts', label: 'SMS Alerts', desc: 'Receive alerts via text message' },
             { key: 'pushAlerts', label: 'Push Notifications', desc: 'Receive in-app notifications' },
           ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+            <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
               <div>
-                <p className="font-medium text-secondary-900">{item.label}</p>
-                <p className="text-sm text-secondary-500">{item.desc}</p>
+                <p className="font-medium text-secondary-900 text-sm">{item.label}</p>
+                <p className="text-sm text-secondary-500 mt-0.5">{item.desc}</p>
               </div>
               <button
                 onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  notifications[item.key] ? 'bg-primary-500' : 'bg-secondary-300'
+                className={`w-12 h-6 rounded-full transition-all duration-300 ${
+                  notifications[item.key] ? 'bg-emerald-500 shadow-md shadow-emerald-500/30' : 'bg-secondary-300'
                 }`}
               >
                 <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -334,7 +334,7 @@ const Settings = () => {
 
       <div>
         <h3 className="text-lg font-semibold text-secondary-900 mb-4">Notification Types</h3>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[
             { key: 'maintenanceAlerts', label: 'Maintenance Alerts', desc: 'Get notified about maintenance issues' },
             { key: 'revenueReports', label: 'Revenue Updates', desc: 'Daily revenue summaries' },
@@ -342,15 +342,15 @@ const Settings = () => {
             { key: 'weeklyDigest', label: 'Weekly Digest', desc: 'Weekly performance summary' },
             { key: 'monthlyReport', label: 'Monthly Report', desc: 'Detailed monthly analytics' },
           ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+            <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
               <div>
-                <p className="font-medium text-secondary-900">{item.label}</p>
-                <p className="text-sm text-secondary-500">{item.desc}</p>
+                <p className="font-medium text-secondary-900 text-sm">{item.label}</p>
+                <p className="text-sm text-secondary-500 mt-0.5">{item.desc}</p>
               </div>
               <button
                 onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  notifications[item.key] ? 'bg-primary-500' : 'bg-secondary-300'
+                className={`w-12 h-6 rounded-full transition-all duration-300 ${
+                  notifications[item.key] ? 'bg-emerald-500 shadow-md shadow-emerald-500/30' : 'bg-secondary-300'
                 }`}
               >
                 <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -374,12 +374,12 @@ const Settings = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-secondary-900 mb-4">Account Security</h3>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Password */}
-          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
             <div>
-              <p className="font-medium text-secondary-900">Password</p>
-              <p className="text-sm text-secondary-500">Last changed 30 days ago</p>
+              <p className="font-medium text-secondary-900 text-sm">Password</p>
+              <p className="text-sm text-secondary-500 mt-0.5">Last changed 30 days ago</p>
             </div>
             <Button variant="outline" size="sm" onClick={() => setShowPasswordModal(true)}>
               Change Password
@@ -387,17 +387,17 @@ const Settings = () => {
           </div>
 
           {/* 2FA */}
-          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
             <div>
-              <p className="font-medium text-secondary-900">Two-Factor Authentication</p>
-              <p className="text-sm text-secondary-500">
+              <p className="font-medium text-secondary-900 text-sm">Two-Factor Authentication</p>
+              <p className="text-sm text-secondary-500 mt-0.5">
                 {security.twoFactorEnabled ? 'Enabled - Using authenticator app' : 'Add an extra layer of security'}
               </p>
             </div>
             <button
               onClick={() => setSecurity(prev => ({ ...prev, twoFactorEnabled: !prev.twoFactorEnabled }))}
-              className={`w-12 h-6 rounded-full transition-colors ${
-                security.twoFactorEnabled ? 'bg-primary-500' : 'bg-secondary-300'
+              className={`w-12 h-6 rounded-full transition-all duration-300 ${
+                security.twoFactorEnabled ? 'bg-emerald-500 shadow-md shadow-emerald-500/30' : 'bg-secondary-300'
               }`}
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -407,10 +407,10 @@ const Settings = () => {
           </div>
 
           {/* Session Timeout */}
-          <div className="flex items-center justify-between p-4 bg-secondary-50 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-gray-50/80 rounded-xl border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200">
             <div>
-              <p className="font-medium text-secondary-900">Session Timeout</p>
-              <p className="text-sm text-secondary-500">Auto logout after inactivity</p>
+              <p className="font-medium text-secondary-900 text-sm">Session Timeout</p>
+              <p className="text-sm text-secondary-500 mt-0.5">Auto logout after inactivity</p>
             </div>
             <Select
               value={security.sessionTimeout}
@@ -429,7 +429,7 @@ const Settings = () => {
 
       <div>
         <h3 className="text-lg font-semibold text-secondary-900 mb-4">API Access</h3>
-        <div className="p-4 bg-secondary-50 rounded-xl">
+        <div className="p-4 bg-gray-50/80 rounded-xl border border-gray-100">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="font-medium text-secondary-900">API Key</p>
@@ -608,19 +608,19 @@ const Settings = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}
         <div className="lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-2xl shadow-card p-2">
+          <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 ${
                   activeTab === tab.id
-                    ? 'bg-primary-50 text-primary-600'
-                    : 'text-secondary-600 hover:bg-secondary-50'
+                    ? 'bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 shadow-sm border border-emerald-100'
+                    : 'text-secondary-600 hover:bg-gray-50 hover:text-secondary-900'
                 }`}
               >
-                <tab.icon className="w-5 h-5" />
-                <span className="font-medium">{tab.label}</span>
+                <tab.icon className={`w-5 h-5 transition-transform duration-200 ${activeTab === tab.id ? 'scale-110' : ''}`} />
+                <span className="font-medium text-sm">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -628,7 +628,7 @@ const Settings = () => {
 
         {/* Main Content */}
         <div className="flex-1">
-          <div className="card">
+          <div className="bg-white rounded-2xl shadow-lg shadow-gray-100/50 border border-gray-100 p-6 sm:p-8">
             {renderContent()}
           </div>
         </div>

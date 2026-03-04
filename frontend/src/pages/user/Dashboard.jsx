@@ -48,6 +48,16 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    if (!user?.id) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   const fetchDashboardData = async () => {
@@ -74,7 +84,11 @@ const Dashboard = () => {
       if (notifRes.success) {
         const unreadNotifications = (notifRes.data || [])
           .filter((notification) => !notification.read)
-          .sort((first, second) => new Date(second.timestamp || 0) - new Date(first.timestamp || 0))
+          .sort(
+            (first, second) =>
+              new Date(second.timestamp || second.createdAt || 0)
+              - new Date(first.timestamp || first.createdAt || 0)
+          )
           .slice(0, 4);
         setNotifications(unreadNotifications);
       }
@@ -298,7 +312,7 @@ const Dashboard = () => {
           </div>
 
           {/* Recent Sessions */}
-          <div className="bg-white rounded-2xl shadow-sm border border-secondary-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-md border border-green-500/30 overflow-hidden">
             <div className="p-6 border-b border-secondary-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-secondary-900">Recent Sessions</h2>
               <Button variant="ghost" size="sm" onClick={() => navigate('/user/history')}>
@@ -345,7 +359,7 @@ const Dashboard = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Notifications */}
-          <div className="bg-white rounded-2xl shadow-sm border border-secondary-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-md border border-green-500/30 overflow-hidden">
             <div className="p-4 border-b border-secondary-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-secondary-900">Notifications</h2>
               {notifications.length > 0 && (
@@ -368,7 +382,7 @@ const Dashboard = () => {
                           {notif.message}
                         </p>
                         <p className="text-xs text-secondary-400 mt-1">
-                          {formatRelativeTime(notif.timestamp)}
+                          {formatRelativeTime(notif.timestamp || notif.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -384,7 +398,7 @@ const Dashboard = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
+          <div className="bg-white rounded-xl shadow-md p-6 border border-green-500/30">
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Quick Actions</h2>
             <div className="space-y-3">
               <button 

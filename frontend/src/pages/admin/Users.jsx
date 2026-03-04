@@ -41,7 +41,7 @@ const Users = () => {
           email: user.email || '',
           phone: user.phone || 'N/A',
           role: user.role || 'user',
-          status: user.isActive ? 'active' : 'inactive',
+          status: user.status || (user.isActive ? 'active' : 'inactive'),
           createdAt: user.joinedDate || null,
           sessions: 0,
           spent: 0,

@@ -9,7 +9,7 @@ const BACKEND_AI_ENDPOINT = `${API_BASE_URL}/ai/optimize`;
 
 /**
  * Call the backend AI endpoint for a charging optimization report.
- * Returns { success: true, text: '...' } or { success: false, error: '...' }
+ * Returns { success: true, text: '...', projection: {...} } or { success: false, error: '...' }
  */
 export const getAiChargingOptimization = async (params) => {
   try {
@@ -30,9 +30,13 @@ export const getAiChargingOptimization = async (params) => {
     }
 
     const data = await resp.json();
-    // Backend returns { success: true, data: { text: '...' } }
+    // Backend returns { success: true, data: { text: '...', projection: {...} } }
     if (data.success && data.data?.text) {
-      return { success: true, text: data.data.text };
+      return {
+        success: true,
+        text: data.data.text,
+        projection: data.data.projection || null,
+      };
     }
 
     return { success: false, error: data.error || 'Unknown backend error' };

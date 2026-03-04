@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import create_app
 from database import get_db
 from models.transaction import Transaction
+from utils.charging import calculate_charging_projection
 
 
 def to_float(value, default=0.0):
@@ -71,15 +72,20 @@ def compute_billing(session, station):
     port = find_port(station, session)
     price_per_kwh = to_float((port or {}).get('price'), 8.0)
     charger_power_kw = max(3.0, to_float((port or {}).get('power'), 22.0))
+    progress = to_float(session.get('progress'), 100.0)
 
-    energy_delivered = to_float(session.get('energy_delivered'), 0.0)
-    if energy_delivered <= 0:
-        estimated_energy = (duration_minutes / 60.0) * charger_power_kw * 0.15
-        energy_delivered = round(max(0.1, estimated_energy), 1)
-    else:
-        energy_delivered = round(energy_delivered, 1)
+    projection = calculate_charging_projection(
+        battery_capacity_kwh=session.get('battery_capacity_kwh') or 60,
+        current_percentage=session.get('battery_start') or 20,
+        target_percentage=session.get('battery_end') or 80,
+        duration_minutes=session.get('planned_duration_minutes') or duration_minutes,
+        rate_per_kwh=price_per_kwh,
+        charger_power_kw=charger_power_kw,
+        progress_percentage=progress,
+    )
 
-    total_cost = round(min(50.0, max(1.0, energy_delivered * price_per_kwh)), 2)
+    energy_delivered = projection['deliveredEnergyKwh']
+    total_cost = projection['deliveredCost']
 
     return {
         'duration': duration_minutes,
@@ -97,8 +103,6 @@ def needs_session_repair(session):
         and (
             cost <= 0
             or total_cost <= 0
-            or cost > 50
-            or total_cost > 50
             or to_float(session.get('energy_delivered'), 0.0) <= 0
             or to_int(session.get('duration'), 0) <= 0
         )

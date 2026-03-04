@@ -33,12 +33,11 @@ const Settings = () => {
 
   // General settings
   const [general, setGeneral] = useState({
-    platformName: 'EvPulse',
+    platformName: 'EVPulse',
     supportEmail: 'support@evpulse.com',
     timezone: 'UTC',
     currency: 'INR',
     language: 'en',
-    maintenanceMode: false,
   });
 
   // Notification settings
@@ -144,37 +143,6 @@ const Settings = () => {
             <option value="fr">French</option>
             <option value="de">German</option>
           </Select>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-900 mb-4">Maintenance Mode</h3>
-        <div className="p-4 bg-secondary-50 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-secondary-900">Maintenance Mode</p>
-              <p className="text-sm text-secondary-500">Disable access for regular users during maintenance</p>
-            </div>
-            <button
-              onClick={() => setGeneral(prev => ({ ...prev, maintenanceMode: !prev.maintenanceMode }))}
-              className={`w-12 h-6 rounded-full transition-colors ${
-                general.maintenanceMode ? 'bg-amber-500' : 'bg-secondary-300'
-              }`}
-            >
-              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                general.maintenanceMode ? 'translate-x-6' : 'translate-x-0.5'
-              }`} />
-            </button>
-          </div>
-          {general.maintenanceMode && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
-              <div>
-                <p className="font-medium text-amber-800">Maintenance Mode Active</p>
-                <p className="text-sm text-amber-700">Users will see a maintenance page when trying to access the platform.</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

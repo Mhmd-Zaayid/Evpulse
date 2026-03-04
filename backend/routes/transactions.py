@@ -16,6 +16,32 @@ def _to_amount(value):
         return 0.0
 
 
+def _build_user_match(user_id):
+    user_oid = to_object_id(user_id)
+    candidates = []
+    seen = set()
+
+    for value in [user_id, str(user_id) if user_id is not None else None, user_oid, str(user_oid) if user_oid else None]:
+        if value is None:
+            continue
+        key = f"{type(value).__name__}:{value}"
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(value)
+
+    return {'$in': candidates}
+
+
+def _wallet_payment_filter(user_id):
+    return {
+        'user_id': _build_user_match(user_id),
+        'payment_method': {'$regex': '^wallet$', '$options': 'i'},
+        'type': 'charging',
+        'status': 'completed'
+    }
+
+
 def _resolve_charging_amounts(db, transactions_data, persist=False):
     charging_session_ids = []
     normalized_session_ids = {}
@@ -80,7 +106,7 @@ def get_transactions():
 
         query = {}
         if user.get('role') == 'user':
-            query['user_id'] = user.get('_id')
+            query['user_id'] = _build_user_match(user.get('_id'))
         elif user.get('role') == 'operator':
             station_ids = [s['_id'] for s in db.stations.find({'operator_id': user.get('_id')}, {'_id': 1})]
             sessions = db.sessions.find({'station_id': {'$in': station_ids}}, {'_id': 1})
@@ -178,17 +204,12 @@ def get_wallet_balance(user_id):
         
         # Calculate balance from transactions
         topups = list(db.transactions.find({
-            'user_id': target_user_id,
+            'user_id': _build_user_match(target_user_id),
             'type': 'wallet_topup',
             'status': 'completed'
         }))
         
-        wallet_payments = list(db.transactions.find({
-            'user_id': target_user_id,
-            'payment_method': 'Wallet',
-            'type': 'charging',
-            'status': 'completed'
-        }))
+        wallet_payments = list(db.transactions.find(_wallet_payment_filter(target_user_id)))
         wallet_payments = _resolve_charging_amounts(db, wallet_payments, persist=True)
         
         total_topup = sum(_to_amount(t.get('amount', 0)) for t in topups)
@@ -246,17 +267,12 @@ def topup_wallet():
         
         # Get new balance
         topups = list(db.transactions.find({
-            'user_id': user_id,
+            'user_id': _build_user_match(user_id),
             'type': 'wallet_topup',
             'status': 'completed'
         }))
         
-        wallet_payments = list(db.transactions.find({
-            'user_id': user_id,
-            'payment_method': 'Wallet',
-            'type': 'charging',
-            'status': 'completed'
-        }))
+        wallet_payments = list(db.transactions.find(_wallet_payment_filter(user_id)))
         wallet_payments = _resolve_charging_amounts(db, wallet_payments, persist=True)
         
         total_topup = sum(_to_amount(t.get('amount', 0)) for t in topups)
@@ -266,7 +282,7 @@ def topup_wallet():
         return jsonify({
             'success': True, 
             'data': {
-                'newBalance': new_balance,
+                'newBalance': max(0, new_balance),
                 'transactionId': str(result.inserted_id)
             }
         }), 201
@@ -287,7 +303,7 @@ def get_transaction_summary(user_id):
         if current.get('role') != 'admin' and current.get('_id') != target_user_id:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
-        transactions = list(db.transactions.find({'user_id': target_user_id}))
+        transactions = list(db.transactions.find({'user_id': _build_user_match(target_user_id)}))
         transactions = _resolve_charging_amounts(db, transactions, persist=True)
         
         charging_total = sum(_to_amount(t.get('amount', 0)) for t in transactions if t.get('type') == 'charging')

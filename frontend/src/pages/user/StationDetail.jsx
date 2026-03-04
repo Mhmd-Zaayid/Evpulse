@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { stationsAPI, bookingsAPI, sessionsAPI, reviewsAPI, transactionsAPI, getSmartChargerRecommendation, estimateSlotDuration, estimateWaitingTime } from '../../services';
 import { getAiChargingOptimization, isAiConfigured } from '../../services/aiService';
-import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime, formatStationAddress, resolveStationImageSrc } from '../../utils';
+import { formatCurrency, formatDistance, getStatusColor, getStatusText, calculateChargingTime, formatStationAddress, resolveStationImageSrc, calculateChargingProjection, MIN_WALLET_BALANCE } from '../../utils';
 import { Button, Badge, Modal, Select, LoadingSpinner, ProgressBar, StationRating, RatingDisplay, RatingSummary } from '../../components';
 import { useNotifications, useAuth } from '../../context';
 import {
@@ -32,11 +32,16 @@ import {
   Settings2,
 } from 'lucide-react';
 
-const ESTIMATED_COST_MIN = 1;
-const ESTIMATED_COST_MAX = 250;
+const MIN_BATTERY_CAPACITY = 25;
+const MAX_BATTERY_CAPACITY = 100;
 
-const clampEstimatedCost = (cost) =>
-  Number(Math.min(ESTIMATED_COST_MAX, Math.max(ESTIMATED_COST_MIN, Number(cost) || 0)).toFixed(2));
+const clampBatteryCapacity = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    return 60;
+  }
+  return Math.min(MAX_BATTERY_CAPACITY, Math.max(MIN_BATTERY_CAPACITY, parsed));
+};
 
 const StationDetail = () => {
   const { id } = useParams();
@@ -67,8 +72,11 @@ const StationDetail = () => {
   const [vehicleType, setVehicleType] = useState('Car');
   const [batteryCapacity, setBatteryCapacity] = useState(60);
   const [aiReport, setAiReport] = useState(null);
+  const [aiProjection, setAiProjection] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(false);
   
   const [bookingData, setBookingData] = useState({
     date: '',
@@ -76,6 +84,12 @@ const StationDetail = () => {
     chargingMode: 'normal',
   });
   const [availableSlots, setAvailableSlots] = useState([]);
+  const percentageToCharge = Math.max(0, Number(targetBattery || 0) - Number(currentBattery || 0));
+  const totalTimeFor100 = 60;
+  const scaledDurationMinutes = (percentageToCharge / 100) * totalTimeFor100;
+  const projectedDurationMinutes = percentageToCharge >= 100
+    ? Math.min(60, Math.max(45, scaledDurationMinutes || totalTimeFor100))
+    : Math.max(1, scaledDurationMinutes);
 
   useEffect(() => {
     fetchStationDetails();
@@ -98,11 +112,13 @@ const StationDetail = () => {
       return;
     }
 
-    const durationMs = 30000;
-    const tickMs = 300;
+    const simulationDurationMs = percentageToCharge >= 100
+      ? Math.min(60000, Math.max(45000, projectedDurationMinutes * 1000))
+      : projectedDurationMinutes * 1000;
+    const tickMs = 500;
     const timer = setInterval(() => {
       setChargingProgress((prev) => {
-        const next = prev + (tickMs / durationMs) * 100;
+        const next = prev + (tickMs / simulationDurationMs) * 100;
         if (next >= 100) {
           clearInterval(timer);
           setIsCharging(false);
@@ -113,7 +129,7 @@ const StationDetail = () => {
     }, tickMs);
 
     return () => clearInterval(timer);
-  }, [showChargingModal, isCharging]);
+  }, [showChargingModal, isCharging, projectedDurationMinutes, percentageToCharge]);
 
   const fetchStationDetails = async () => {
     try {
@@ -157,6 +173,31 @@ const StationDetail = () => {
     }
   };
 
+  const fetchWalletBalance = useCallback(async () => {
+    if (!user?.id) {
+      setWalletBalance(null);
+      return;
+    }
+
+    setWalletLoading(true);
+    try {
+      const walletRes = await transactionsAPI.getWalletBalance(user.id);
+      if (walletRes?.success) {
+        setWalletBalance(Number(walletRes?.data?.balance ?? 0));
+      } else {
+        setWalletBalance(0);
+      }
+    } catch (error) {
+      setWalletBalance(0);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, [fetchWalletBalance]);
+
   const updateAiRecommendations = () => {
     if (!station || !station.ports) return;
     
@@ -179,7 +220,7 @@ const StationDetail = () => {
 
     // Update battery capacity from user profile if available
     if (user?.vehicle?.batteryCapacity) {
-      setBatteryCapacity(user.vehicle.batteryCapacity);
+      setBatteryCapacity(clampBatteryCapacity(user.vehicle.batteryCapacity));
     }
   };
 
@@ -194,7 +235,7 @@ const StationDetail = () => {
     const port = selectedPort || station.ports.find(p => p.status === 'available') || station.ports[0];
     const chargerType = port?.type?.includes('DC') ? 'Fast' : 'Normal';
     const chargerPower = port?.power || 22;
-    const costPerKwh = port?.price ? port.price * 84 : 8; // Convert USD to ₹ approx
+    const costPerKwh = Number(port?.price ?? 8);
 
     const peakStart = station.peakHours?.start || '18:00';
     const peakEnd = station.peakHours?.end || '21:00';
@@ -205,30 +246,38 @@ const StationDetail = () => {
       return `${hr > 12 ? hr - 12 : hr || 12}${m !== '00' ? ':' + m : ''} ${ampm}`;
     };
     const peakHoursStr = `${formatTime12(peakStart)} – ${formatTime12(peakEnd)}`;
+    const normalizedBatteryCapacity = clampBatteryCapacity(batteryCapacity);
+    if (normalizedBatteryCapacity !== batteryCapacity) {
+      setBatteryCapacity(normalizedBatteryCapacity);
+    }
 
     try {
       const result = await getAiChargingOptimization({
         vehicleType,
-        batteryCapacity,
+        batteryCapacity: normalizedBatteryCapacity,
         currentPercentage: currentBattery,
         targetPercentage: targetBattery,
         chargerType,
         chargerPower,
+        durationMinutes: projectedDurationMinutes,
         costPerKwh: Math.round(costPerKwh * 100) / 100,
         peakHours: peakHoursStr,
       });
 
       if (result.success) {
         setAiReport(result.text);
+        setAiProjection(result.projection || null);
       } else {
         setAiError(result.error);
+        setAiProjection(null);
       }
     } catch (err) {
       setAiError(err.message || 'Failed to fetch AI optimization');
+      setAiProjection(null);
     } finally {
       setAiLoading(false);
     }
-  }, [station, selectedPort, vehicleType, batteryCapacity, currentBattery, targetBattery]);
+  }, [station, selectedPort, vehicleType, batteryCapacity, currentBattery, targetBattery, projectedDurationMinutes]);
 
   const handlePortSelect = (port) => {
     if (port.status === 'available') {
@@ -249,6 +298,10 @@ const StationDetail = () => {
         date: bookingData.date,
         timeSlot: bookingData.timeSlot,
         chargingType: selectedPort?.type || 'Normal AC',
+        batteryStart: currentBattery,
+        batteryTarget: targetBattery,
+        batteryCapacity,
+        durationMinutes: sessionProjection.durationMinutes,
       });
 
       if (!response.success) {
@@ -283,8 +336,9 @@ const StationDetail = () => {
     try {
       const walletRes = await transactionsAPI.getWalletBalance(user.id);
       const walletBalance = Number(walletRes?.data?.balance ?? 0);
-      if (!walletRes?.success || walletBalance <= 0) {
-        showToast({ type: 'error', message: 'Insufficient wallet balance' });
+      setWalletBalance(walletBalance);
+      if (!walletRes?.success || walletBalance < MIN_WALLET_BALANCE) {
+        showToast({ type: 'error', message: `Minimum wallet balance must be ₹${MIN_WALLET_BALANCE} to start charging.` });
         return;
       }
 
@@ -294,6 +348,11 @@ const StationDetail = () => {
         chargingType: selectedPort.type || 'Normal AC',
         paymentMethod: 'Wallet',
         batteryStart: currentBattery,
+        batteryTarget: targetBattery,
+        batteryCapacity,
+        durationMinutes: sessionProjection.durationMinutes,
+        pricePerKwh: sessionProjection.pricePerKwh,
+        chargerPowerKw: sessionProjection.chargerPowerKw,
       });
 
       if (!response.success) {
@@ -319,12 +378,10 @@ const StationDetail = () => {
     }
 
     try {
-      const elapsedMinutes = Math.max(1, Math.round((chargingProgress / 100) * 30));
+      const elapsedMinutes = Math.max(1, Math.round((chargingProgress / 100) * sessionProjection.durationMinutes));
       const response = await sessionsAPI.stopSession(activeSessionId, {
         progress: chargingProgress,
         durationMinutes: elapsedMinutes,
-        energyDelivered: deliveredKwh,
-        totalCost: currentCost,
       });
       if (!response.success) {
         showToast({ type: 'error', message: response.error || 'Failed to stop session' });
@@ -336,6 +393,7 @@ const StationDetail = () => {
       setShowChargingModal(false);
       setActiveSessionId(null);
       setExistingActiveSession(null);
+      await fetchWalletBalance();
       showToast({ type: 'success', message: 'Charging session completed!' });
       setTimeout(() => setShowRatingModal(true), 500);
     } catch (error) {
@@ -439,25 +497,34 @@ const StationDetail = () => {
       station.pricing?.perKwh ??
       0
   );
-  const maxBillableKwh = selectedPortPrice > 0 ? (ESTIMATED_COST_MAX / selectedPortPrice) : 10;
-  const chargingWindowMinutes = Math.max(15, Number(slotEstimate?.estimatedChargingTime) || 30);
-  const estimatedSessionKwh = Number(
-    Math.max(
-      0.1,
-      Math.min(
-        maxBillableKwh,
-        (chargingWindowMinutes / 60) * Math.max(selectedPortPower || 22, 3) * 0.15
-      )
-    ).toFixed(1)
+  const sessionProjection = calculateChargingProjection({
+    batteryCapacity,
+    currentBattery,
+    targetBattery,
+    durationMinutes: projectedDurationMinutes,
+    pricePerKwh: Math.max(selectedPortPrice || aiEffectivePrice || 8, 0.1),
+    chargerPowerKw: Math.max(selectedPortPower || aiEffectivePort?.power || 22, 3),
+    progress: 100,
+  });
+  const progressProjection = calculateChargingProjection({
+    batteryCapacity,
+    currentBattery,
+    targetBattery,
+    durationMinutes: projectedDurationMinutes,
+    pricePerKwh: Math.max(selectedPortPrice || aiEffectivePrice || 8, 0.1),
+    chargerPowerKw: Math.max(selectedPortPower || aiEffectivePort?.power || 22, 3),
+    progress: chargingProgress,
+  });
+  const estimatedSessionKwh = sessionProjection.targetEnergyKwh;
+  const estimatedSessionCost = sessionProjection.estimatedCost;
+  const deliveredKwh = progressProjection.deliveredEnergyKwh;
+  const currentCost = progressProjection.deliveredCost;
+  const minutesLeft = Math.max(0, Math.ceil((sessionProjection.durationMinutes * (100 - chargingProgress)) / 100));
+  const aiEnergyRequired = Number((aiProjection?.targetEnergyKwh ?? estimatedSessionKwh).toFixed(1));
+  const aiChargingMinutes = Number(aiProjection?.durationMinutes ?? sessionProjection.durationMinutes);
+  const aiEstimatedCost = Number(
+    (aiProjection?.estimatedTotalCost ?? aiProjection?.estimatedCost ?? estimatedSessionCost).toFixed(2)
   );
-  const estimatedSessionCost = clampEstimatedCost(estimatedSessionKwh * Math.max(selectedPortPrice, 0));
-  const progressRatio = Math.min(1, Math.max(0, chargingProgress / 100));
-  const deliveredKwh = Number((estimatedSessionKwh * progressRatio).toFixed(1));
-  const currentCost = Number((estimatedSessionCost * progressRatio).toFixed(2));
-  const minutesLeft = Math.max(0, Math.ceil((100 - chargingProgress) * 0.3));
-  const aiEnergyRequired = Number(((batteryCapacity * Math.max(0, targetBattery - currentBattery)) / 100).toFixed(1));
-  const aiChargingMinutes = slotEstimate?.estimatedChargingTime || Math.ceil((aiEnergyRequired / Math.max(selectedPortPower || 22, 1)) * 60);
-  const aiEstimatedCost = clampEstimatedCost(aiEnergyRequired * Math.max(selectedPortPrice || aiEffectivePrice, 0));
   const aiReportPoints = (aiReport || '')
     .split('\n')
     .map((line) => line.trim().replace(/^[-•*]\s*/, ''))
@@ -472,6 +539,9 @@ const StationDetail = () => {
     ? `Try before ${peakStart} or after ${peakEnd}`
     : 'Prefer non-peak hours for better cost efficiency';
   const stationImageSrc = resolveStationImageSrc(station);
+  const walletBalanceValue = Number(walletBalance ?? 0);
+  const isWalletBelowMinimum = walletBalance !== null && walletBalanceValue < MIN_WALLET_BALANCE;
+  const isStartChargingDisabled = isCharging || Boolean(existingActiveSession) || walletLoading || isWalletBelowMinimum;
   const activeSessionStationName = existingActiveSession?.stationName || 'Unknown Station';
   const activeSessionPort = existingActiveSession?.portId;
   const activeSessionStartLabel = existingActiveSession?.startTime
@@ -591,10 +661,10 @@ const StationDetail = () => {
                   <label className="text-xs font-medium text-secondary-600 mb-1 block">Battery Capacity (kWh)</label>
                   <input
                     type="number"
-                    min="10"
-                    max="200"
+                    min={MIN_BATTERY_CAPACITY}
+                    max={MAX_BATTERY_CAPACITY}
                     value={batteryCapacity}
-                    onChange={(e) => setBatteryCapacity(parseInt(e.target.value) || 60)}
+                    onChange={(e) => setBatteryCapacity(clampBatteryCapacity(e.target.value))}
                     className="w-full px-3 py-2 text-sm border border-secondary-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
                   />
                 </div>
@@ -881,11 +951,20 @@ const StationDetail = () => {
                   <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-amber-700 font-medium">Ensure the charging gun is securely connected to the vehicle</p>
                 </div>
+                <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-xl">
+                  <p className="text-sm text-secondary-600">Wallet Balance</p>
+                  <p className={`text-base font-semibold ${isWalletBelowMinimum ? 'text-red-600' : 'text-green-600'}`}>
+                    {walletLoading ? 'Checking...' : formatCurrency(walletBalanceValue)}
+                  </p>
+                  {isWalletBelowMinimum && (
+                    <p className="text-sm text-red-600 mt-1">Minimum wallet balance must be ₹{MIN_WALLET_BALANCE} to start charging.</p>
+                  )}
+                </div>
                 <Button 
                   fullWidth 
                   icon={Play}
                   onClick={handleStartCharging}
-                  disabled={isCharging || Boolean(existingActiveSession)}
+                  disabled={isStartChargingDisabled}
                 >
                   Start Now
                 </Button>

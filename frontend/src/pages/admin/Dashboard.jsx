@@ -42,6 +42,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
+    const intervalId = setInterval(fetchStats, 15000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const fetchStats = async () => {

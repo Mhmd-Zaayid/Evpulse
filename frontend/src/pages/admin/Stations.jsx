@@ -39,6 +39,12 @@ const Stations = () => {
   const [showStationModal, setShowStationModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    operatorId: '',
+    address: '',
+    status: 'available',
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const operators = [...new Map(stations.map((s) => [s.operatorId, { id: s.operatorId, name: s.operator || 'Unknown Operator' }])).values()]
@@ -73,8 +79,8 @@ const Stations = () => {
             status: station.status || 'offline',
             ports: ports.length,
             activePorts,
-            totalSessions: 0,
-            revenue: 0,
+            totalSessions: Number(station.totalSessions || 0),
+            revenue: Number(station.revenue || 0),
             rating: station.rating || 0,
           };
         });
@@ -106,6 +112,12 @@ const Stations = () => {
 
   const handleEditStation = (station) => {
     setSelectedStation(station);
+    setEditForm({
+      name: station?.name || '',
+      operatorId: station?.operatorId || '',
+      address: station?.address || '',
+      status: station?.status || 'available',
+    });
     setShowStationModal(true);
   };
 
@@ -144,7 +156,7 @@ const Stations = () => {
       if (response?.success) {
         showToast({ 
           type: 'success', 
-          message: `Station ${newStatus === 'offline' ? 'taken offline' : 'brought online'} successfully!` 
+          message: `Station ${newStatus === 'offline' ? 'marked offline' : 'brought online'} successfully!` 
         });
         await fetchStations();
       } else {
@@ -484,9 +496,14 @@ const Stations = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Station Name"
-                defaultValue={selectedStation.name}
+                value={editForm.name}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
               />
-              <Select label="Operator" defaultValue={selectedStation.operatorId}>
+              <Select
+                label="Operator"
+                value={editForm.operatorId}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, operatorId: event.target.value }))}
+              >
                 {operators.map(op => (
                   <option key={op.id} value={op.id}>{op.name}</option>
                 ))}
@@ -494,15 +511,21 @@ const Stations = () => {
             </div>
             <Input
               label="Address"
-              defaultValue={selectedStation.address}
+              value={editForm.address}
+              onChange={(event) => setEditForm((prev) => ({ ...prev, address: event.target.value }))}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Number of Ports"
                 type="number"
-                defaultValue={selectedStation.ports}
+                value={selectedStation.ports}
+                disabled
               />
-              <Select label="Status" defaultValue={selectedStation.status}>
+              <Select
+                label="Status"
+                value={editForm.status}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value }))}
+              >
                 <option value="available">Available</option>
                 <option value="busy">Busy</option>
                 <option value="offline">Offline</option>
@@ -521,8 +544,28 @@ const Stations = () => {
               </Button>
               <Button
                 fullWidth
-                onClick={() => {
-                    showToast({ type: 'info', message: 'Station edit API is not available yet' });
+                onClick={async () => {
+                  if (!selectedStation?.id) {
+                    showToast({ type: 'error', message: 'Invalid station selection' });
+                    return;
+                  }
+
+                  const payload = {
+                    name: editForm.name?.trim(),
+                    operatorId: editForm.operatorId,
+                    address: editForm.address?.trim(),
+                    nearbyLandmark: editForm.address?.trim(),
+                    status: editForm.status,
+                  };
+
+                  const response = await adminAPI.updateStation(selectedStation.id, payload);
+                  if (!response?.success) {
+                    showToast({ type: 'error', message: response?.error || 'Failed to update station' });
+                    return;
+                  }
+
+                  showToast({ type: 'success', message: 'Station updated successfully!' });
+                  await fetchStations();
                   setShowStationModal(false);
                   setSelectedStation(null);
                 }}

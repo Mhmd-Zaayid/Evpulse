@@ -36,7 +36,11 @@ const Bookings = () => {
   const handleCancelBooking = async () => {
     try {
       await bookingsAPI.cancel(selectedBooking.id);
-      setBookings(prev => prev.filter(b => b.id !== selectedBooking.id));
+      setBookings(prev => prev.map((booking) => (
+        booking.id === selectedBooking.id
+          ? { ...booking, status: 'cancelled' }
+          : booking
+      )));
       setShowCancelModal(false);
       setSelectedBooking(null);
       showToast({ type: 'success', message: 'Booking cancelled successfully' });
@@ -46,7 +50,9 @@ const Bookings = () => {
   };
 
   const upcomingBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
-  const pastBookings = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  const pastBookings = bookings.filter(
+    (b) => b.status === 'completed' || b.status === 'cancelled' || b.status === 'missed_charging'
+  );
 
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
 
@@ -98,7 +104,17 @@ const Bookings = () => {
       key: 'status',
       label: 'Status',
       render: (_, row) => (
-        <Badge variant={row.status === 'confirmed' ? 'success' : row.status === 'pending' ? 'warning' : 'default'}>
+        <Badge
+          variant={
+            row.status === 'confirmed'
+              ? 'success'
+              : row.status === 'pending'
+              ? 'warning'
+              : row.status === 'missed_charging'
+              ? 'danger'
+              : 'default'
+          }
+        >
           {getStatusText(row.status)}
         </Badge>
       ),

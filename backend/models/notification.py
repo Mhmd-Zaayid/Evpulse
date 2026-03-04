@@ -1,6 +1,15 @@
 from datetime import datetime
 from bson import ObjectId
 
+
+def _iso_utc(dt):
+    if not dt:
+        return None
+    iso = dt.isoformat()
+    if dt.tzinfo is None:
+        return f'{iso}Z'
+    return iso
+
 class Notification:
     """Notification model for MongoDB"""
     
@@ -54,5 +63,6 @@ class Notification:
             'message': self.message,
             'actionUrl': self.action_url,
             'read': self.read,
-            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+            'timestamp': _iso_utc(self.timestamp),
+            'createdAt': _iso_utc(self.created_at),
         }

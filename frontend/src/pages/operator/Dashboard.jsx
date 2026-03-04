@@ -25,11 +25,13 @@ const OperatorDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    const intervalId = setInterval(fetchDashboardData, 15000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const response = await operatorAPI.getStats(user.id);
+      const response = await operatorAPI.getStats('month');
       setStats({
         totalStations: 0,
         activeSessions: 0,

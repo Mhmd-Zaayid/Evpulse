@@ -142,8 +142,8 @@ const Navbar = ({ onMenuClick }) => {
               onBlur={() => setSearchFocused(false)}
               className={`w-full pl-12 pr-20 py-3 bg-secondary-50/80 border rounded-2xl outline-none transition-all duration-200 ${
                 searchFocused 
-                  ? 'border-primary-500 ring-4 ring-primary-500/10 bg-white shadow-lg' 
-                  : 'border-secondary-200 hover:border-secondary-300'
+                  ? 'border-green-500 ring-2 ring-green-400 bg-white shadow-lg' 
+                  : 'border-green-500 hover:border-green-500'
               }`}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 bg-secondary-200/60 rounded-lg">
@@ -221,7 +221,7 @@ const Navbar = ({ onMenuClick }) => {
                             {notification.message}
                           </p>
                           <p className="text-xs text-secondary-400 mt-2">
-                            {formatRelativeTime(notification.timestamp)}
+                            {formatRelativeTime(notification.timestamp || notification.createdAt)}
                           </p>
                         </div>
                         {!notification.read && (

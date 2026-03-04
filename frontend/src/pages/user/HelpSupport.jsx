@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { 
   HelpCircle, 
-  MessageCircle, 
   Phone, 
   Mail, 
   ChevronDown, 
@@ -130,11 +129,11 @@ const HelpSupport = () => {
       actionType: 'email'
     },
     {
-      icon: MessageCircle,
-      title: 'Live Chat',
-      description: 'Chat with us in real-time',
-      action: 'Start Chat',
-      actionType: 'chat'
+      icon: FileText,
+      title: 'Support Center',
+      description: 'Browse guides and support resources',
+      action: 'Open Help Center',
+      actionType: 'portal'
     }
   ];
 
@@ -281,9 +280,9 @@ const HelpSupport = () => {
             <Button 
               variant="secondary"
               className="bg-white/20 text-white hover:bg-white/30 border-white/30"
-              icon={MessageCircle}
+              icon={Mail}
             >
-              Live Chat
+              Email Us
             </Button>
           </div>
         </div>

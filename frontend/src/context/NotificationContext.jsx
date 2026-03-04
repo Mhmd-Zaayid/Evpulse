@@ -40,6 +40,18 @@ export const NotificationProvider = ({ children }) => {
     refreshNotifications();
   }, [refreshNotifications]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      refreshNotifications();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user?.id, refreshNotifications]);
+
   const addNotification = useCallback((notification) => {
     const newNotification = {
       id: Date.now(),
@@ -78,13 +90,27 @@ export const NotificationProvider = ({ children }) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
+  const inferToastType = useCallback((toast = {}) => {
+    const message = String(toast?.message || '').toLowerCase();
+    const explicitType = toast?.type;
+
+    const errorKeywords = ['disabled', 'deleted', 'suspended', 'missed', 'failed'];
+    const hasErrorKeyword = errorKeywords.some((keyword) => message.includes(keyword));
+
+    if (hasErrorKeyword) {
+      return 'error';
+    }
+
+    return explicitType || 'info';
+  }, []);
+
   const showToast = useCallback((toast) => {
     const id = Date.now();
-    setToasts(prev => [...prev, { id, ...toast }]);
+    setToasts(prev => [...prev, { id, ...toast, type: inferToastType(toast) }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, toast.duration || 5000);
-  }, []);
+  }, [inferToastType]);
 
   const removeToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.id !== id));

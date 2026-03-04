@@ -7,6 +7,28 @@ from datetime import datetime
 
 users_bp = Blueprint('users', __name__)
 
+
+def _normalize_vehicle_payload(vehicle_data):
+    if vehicle_data is None:
+        return None, None
+    if not isinstance(vehicle_data, dict):
+        return None, 'Vehicle data must be an object'
+
+    normalized_vehicle = dict(vehicle_data)
+    battery_capacity = normalized_vehicle.get('batteryCapacity')
+    if battery_capacity not in (None, ''):
+        try:
+            normalized_capacity = int(battery_capacity)
+        except (TypeError, ValueError):
+            return None, 'Battery capacity must be a whole number between 30 and 100 kWh'
+
+        if normalized_capacity < 30 or normalized_capacity > 100:
+            return None, 'Battery capacity must be between 30 and 100 kWh'
+
+        normalized_vehicle['batteryCapacity'] = normalized_capacity
+
+    return normalized_vehicle, None
+
 @users_bp.route('/<user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
@@ -45,9 +67,15 @@ def update_user(user_id):
         
         data = request.get_json()
         
+        vehicle_payload, vehicle_error = _normalize_vehicle_payload(data.get('vehicle'))
+        if vehicle_error:
+            return jsonify({'success': False, 'error': vehicle_error}), 400
+
         # Fields that can be updated
         allowed_fields = ['name', 'phone', 'avatar', 'vehicle', 'company', 'department']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
+        if 'vehicle' in update_data:
+            update_data['vehicle'] = vehicle_payload
         update_data['updated_at'] = datetime.utcnow()
         
         result = db.users.update_one(

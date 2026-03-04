@@ -1,24 +1,20 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   MessageSquare, 
   Star, 
   TrendingUp, 
   TrendingDown,
   Filter,
-  Search,
-  ThumbsUp,
-  ThumbsDown,
   AlertCircle,
   CheckCircle,
-  Clock,
   MapPin,
   Zap,
   User,
   Calendar,
-  BarChart3
 } from 'lucide-react';
-import { Button, Badge, LoadingSpinner, Modal } from '../../components/ui';
+import { Button, LoadingSpinner, Modal } from '../../components/ui';
 import { operatorAPI } from '../../services';
+import { formatDate } from '../../utils';
 
 const Feedback = () => {
   const [feedbackData, setFeedbackData] = useState(null);
@@ -26,7 +22,6 @@ const Feedback = () => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchFeedback();
@@ -68,28 +63,8 @@ const Feedback = () => {
     return 'text-red-600 bg-red-100';
   };
 
-  const getSentimentIcon = (sentiment) => {
-    switch (sentiment) {
-      case 'positive':
-        return <ThumbsUp className="h-4 w-4 text-green-500" />;
-      case 'negative':
-        return <ThumbsDown className="h-4 w-4 text-red-500" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'resolved':
-        return <Badge variant="success">Resolved</Badge>;
-      case 'pending':
-        return <Badge variant="warning">Pending</Badge>;
-      case 'acknowledged':
-        return <Badge variant="info">Acknowledged</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
+  const getDisplayDate = (review) => {
+    return formatDate(review?.date || review?.createdAt || review?.timestamp || null);
   };
 
   const filteredReviews = feedbackData?.reviews?.filter(review => {
@@ -97,12 +72,8 @@ const Feedback = () => {
       (filter === 'positive' && review.rating >= 4) ||
       (filter === 'negative' && review.rating <= 2) ||
       (filter === 'neutral' && review.rating === 3);
-    
-    const matchesSearch = review.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.stationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.comment.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesFilter && matchesSearch;
+
+    return matchesFilter;
   }) || [];
 
   if (loading) {
@@ -179,18 +150,16 @@ const Feedback = () => {
         <div className="rounded-xl p-6 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 border border-green-500/20 bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 transition-all duration-300 hover:scale-[1.02]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Issues Resolved</p>
+              <p className="text-sm font-semibold text-emerald-100/80 drop-shadow-sm">Reported Issues</p>
               <p className="text-2xl font-bold text-white mt-1 drop-shadow-md">
-                {feedbackData?.stats?.resolvedIssues || 0}
+                {feedbackData?.stats?.issueReports || 0}
               </p>
             </div>
             <div className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-green-300 shadow-lg shadow-emerald-500/30">
               <CheckCircle className="h-6 w-6 text-green-900" />
             </div>
           </div>
-          <p className="text-sm text-emerald-100/70 mt-2 drop-shadow-sm">
-            {feedbackData?.stats?.pendingIssues || 0} pending
-          </p>
+          <p className="text-sm text-emerald-100/70 mt-2 drop-shadow-sm">Based on latest feedback</p>
         </div>
       </div>
 
@@ -222,19 +191,9 @@ const Feedback = () => {
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Filters */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search reviews..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            />
-          </div>
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-400" />
             <select
@@ -286,7 +245,6 @@ const Feedback = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {getSentimentIcon(review.sentiment)}
                       {renderStars(review.rating)}
                     </div>
                   </div>
@@ -297,14 +255,13 @@ const Feedback = () => {
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        <span>{new Date(review.date).toLocaleDateString()}</span>
+                        <span>{getDisplayDate(review)}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Zap className="h-4 w-4" />
                         <span>{review.chargerType}</span>
                       </div>
                     </div>
-                    {getStatusBadge(review.status)}
                   </div>
                 </div>
               </div>
@@ -356,7 +313,7 @@ const Feedback = () => {
             <div className="flex items-center gap-2">
               {renderStars(selectedFeedback.rating)}
               <span className="text-sm text-gray-500">
-                {new Date(selectedFeedback.date).toLocaleDateString()}
+                {getDisplayDate(selectedFeedback)}
               </span>
             </div>
             
@@ -377,10 +334,6 @@ const Feedback = () => {
                 <p className="text-gray-500">Energy Consumed</p>
                 <p className="font-medium">{selectedFeedback.energyConsumed || 'N/A'} kWh</p>
               </div>
-              <div>
-                <p className="text-gray-500">Status</p>
-                {getStatusBadge(selectedFeedback.status)}
-              </div>
             </div>
             
             <div className="flex gap-2 mt-4">
@@ -390,12 +343,6 @@ const Feedback = () => {
                 onClick={() => setShowDetailModal(false)}
               >
                 Close
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-              >
-                Mark as Resolved
               </Button>
             </div>
           </div>

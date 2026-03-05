@@ -42,9 +42,9 @@ const Users = () => {
           phone: user.phone || 'N/A',
           role: user.role || 'user',
           status: user.status || (user.isActive ? 'active' : 'inactive'),
-          createdAt: user.joinedDate || null,
-          sessions: 0,
-          spent: 0,
+          createdAt: user.joinedDate || user.createdAt || user.created_at || null,
+          sessions: Number(user.totalSessions ?? user.sessionCount ?? user.sessions ?? 0),
+          spent: Number(user.totalSpent ?? user.spent ?? 0),
           stations: Array.isArray(user.stations) ? user.stations.length : 0,
         }));
         setUsers(mappedUsers);
@@ -186,7 +186,7 @@ const Users = () => {
     {
       key: 'sessions',
       label: 'Sessions',
-      render: (value, row) => row.role === 'user' ? value : '-',
+      render: (value) => Number.isFinite(Number(value)) ? Number(value) : 0,
     },
     {
       key: 'actions',

@@ -30,6 +30,90 @@ def _build_user_name_map(db, user_ids):
         for user in users
     }
 
+
+def _build_user_profile_map(db, user_ids):
+    valid_ids = []
+    for user_id in user_ids:
+        oid = to_object_id(user_id)
+        if oid:
+            valid_ids.append(oid)
+
+    if not valid_ids:
+        return {}
+
+    users = list(db.users.find(
+        {'_id': {'$in': valid_ids}},
+        {'name': 1, 'email': 1, 'phone': 1}
+    ))
+
+    return {
+        str(user['_id']): {
+            'name': user.get('name') or user.get('email') or 'Unknown Operator',
+            'email': user.get('email') or 'Not provided',
+            'phone': user.get('phone') or 'Not provided',
+        }
+        for user in users
+    }
+
+
+def _station_today_metrics(db, station_id):
+    station_oid = to_object_id(station_id)
+    if not station_oid:
+        return {
+            'totalSessionsToday': 0,
+            'energyDeliveredToday': 0,
+            'vehiclesChargedToday': 0,
+            'utilizationPercent': 0,
+        }
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    station_filter = {'$in': [station_oid, str(station_oid)]}
+    sessions = list(db.sessions.find({
+        'station_id': station_filter,
+        '$or': [
+            {'start_time': {'$gte': today_start}},
+            {'created_at': {'$gte': today_start}},
+            {'updated_at': {'$gte': today_start}},
+        ]
+    }, {
+        'status': 1,
+        'energy_delivered': 1,
+        'energyDelivered': 1,
+        'user_id': 1,
+    }))
+
+    relevant_sessions = [
+        session for session in sessions
+        if str(session.get('status') or '').lower() in {'active', 'completed'}
+    ]
+
+    total_sessions_today = len(relevant_sessions)
+    energy_delivered_today = round(sum(
+        float(session.get('energy_delivered', session.get('energyDelivered', 0)) or 0)
+        for session in relevant_sessions
+    ), 1)
+
+    vehicles_charged_today = len({
+        str(session.get('user_id'))
+        for session in relevant_sessions
+        if session.get('user_id') is not None
+    })
+
+    utilization_percent = 0
+    station_doc = db.stations.find_one({'_id': station_oid}, {'ports': 1})
+    total_ports = len((station_doc or {}).get('ports', []))
+    if total_ports > 0:
+        utilization_percent = min(100, round((total_sessions_today / total_ports) * 100))
+
+    return {
+        'totalSessionsToday': total_sessions_today,
+        'energyDeliveredToday': energy_delivered_today,
+        'vehiclesChargedToday': vehicles_charged_today,
+        'utilizationPercent': utilization_percent,
+    }
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calculate distance between two coordinates in km using Haversine formula"""
     R = 6371  # Earth's radius in km
@@ -70,7 +154,7 @@ def get_all_stations():
         
         # Fetch from MongoDB database
         stations_data = list(db.stations.find(query))
-        operator_name_map = _build_user_name_map(db, [data.get('operator_id') for data in stations_data])
+        operator_profile_map = _build_user_profile_map(db, [data.get('operator_id') for data in stations_data])
         stations = []
         
         for data in stations_data:
@@ -102,10 +186,10 @@ def get_all_stations():
                     continue
             
             station_response = station.to_response_dict(distance=distance)
-            station_response['operatorName'] = operator_name_map.get(
-                station_response.get('operatorId'),
-                'Unknown Operator'
-            )
+            operator_profile = operator_profile_map.get(station_response.get('operatorId'), {})
+            station_response['operatorName'] = operator_profile.get('name', 'Unknown Operator')
+            station_response['operatorEmail'] = operator_profile.get('email', 'Not provided')
+            station_response['operatorPhone'] = operator_profile.get('phone', 'Not provided')
             stations.append(station_response)
         
         # Sort results
@@ -133,11 +217,31 @@ def get_station_by_id(station_id):
         
         station = Station.from_dict(station_data)
         station_response = station.to_response_dict()
-        operator_name_map = _build_user_name_map(db, [station_response.get('operatorId')])
-        station_response['operatorName'] = operator_name_map.get(
-            station_response.get('operatorId'),
-            'Unknown Operator'
+        operator_id_for_profile = station_response.get('operatorId') or str(station_data.get('operator_id') or station_data.get('operatorId') or '')
+        operator_profile_map = _build_user_profile_map(db, [operator_id_for_profile])
+        operator_profile = operator_profile_map.get(operator_id_for_profile, {})
+        station_response['operatorName'] = operator_profile.get('name', 'Unknown Operator')
+
+        station_email_fallback = (
+            station_data.get('operator_email')
+            or station_data.get('operatorEmail')
+            or station_data.get('contact_email')
+            or station_data.get('contactEmail')
+            or station_data.get('email')
+            or 'Not provided'
         )
+        station_phone_fallback = (
+            station_data.get('operator_phone')
+            or station_data.get('operatorPhone')
+            or station_data.get('contact_phone')
+            or station_data.get('contactPhone')
+            or station_data.get('phone')
+            or 'Not provided'
+        )
+
+        station_response['operatorEmail'] = operator_profile.get('email') or station_email_fallback
+        station_response['operatorPhone'] = operator_profile.get('phone') or station_phone_fallback
+        station_response.update(_station_today_metrics(db, station_data.get('_id')))
         return jsonify({'success': True, 'data': station_response})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -155,14 +259,14 @@ def get_stations_by_operator(operator_id):
             return jsonify({'success': False, 'error': 'Invalid operator id'}), 400
 
         stations_data = list(db.stations.find({'operator_id': op_oid}))
-        operator_name_map = _build_user_name_map(db, [data.get('operator_id') for data in stations_data])
+        operator_profile_map = _build_user_profile_map(db, [data.get('operator_id') for data in stations_data])
         stations = []
         for data in stations_data:
             station_response = Station.from_dict(data).to_response_dict()
-            station_response['operatorName'] = operator_name_map.get(
-                station_response.get('operatorId'),
-                'Unknown Operator'
-            )
+            operator_profile = operator_profile_map.get(station_response.get('operatorId'), {})
+            station_response['operatorName'] = operator_profile.get('name', 'Unknown Operator')
+            station_response['operatorEmail'] = operator_profile.get('email', 'Not provided')
+            station_response['operatorPhone'] = operator_profile.get('phone', 'Not provided')
             stations.append(station_response)
         
         return jsonify({'success': True, 'data': stations})

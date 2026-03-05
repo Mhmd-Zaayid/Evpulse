@@ -3,7 +3,7 @@ from database import get_db
 from models.booking import Booking
 from models.notification import Notification
 from bson import ObjectId
-from datetime import datetime, time
+from datetime import datetime, timedelta
 from pymongo.errors import DuplicateKeyError
 from utils.charging import calculate_charging_projection
 
@@ -11,13 +11,36 @@ from routes.common import role_required, to_object_id, now_utc
 
 bookings_bp = Blueprint('bookings', __name__)
 
-# Available time slots
-AVAILABLE_TIME_SLOTS = [
-    '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00',
-    '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00',
-    '16:00 - 17:00', '17:00 - 18:00', '18:00 - 19:00', '19:00 - 20:00',
-    '20:00 - 21:00'
-]
+SLOT_START_MINUTES = 6 * 60   # 06:00
+SLOT_END_MINUTES = 24 * 60    # 24:00 (shown as 00:00)
+
+
+def _is_fast_charger(port_type):
+    label = str(port_type or '').strip().lower()
+    return 'fast' in label or 'dc' in label
+
+
+def _format_minutes(total_minutes):
+    normalized = int(total_minutes) % (24 * 60)
+    hours = normalized // 60
+    minutes = normalized % 60
+    return f'{hours:02d}:{minutes:02d}'
+
+
+def _generate_time_slots(charging_type='normal'):
+    is_fast = _is_fast_charger(charging_type)
+    interval_minutes = 30 if is_fast else 60
+    buffer_minutes = 5 if is_fast else 0
+
+    slots = []
+    cursor = SLOT_START_MINUTES
+    while cursor + interval_minutes <= SLOT_END_MINUTES:
+        slot_start = _format_minutes(cursor)
+        slot_end = _format_minutes(cursor + interval_minutes)
+        slots.append(f'{slot_start} - {slot_end}')
+        cursor += interval_minutes + buffer_minutes
+
+    return slots
 
 
 def _normalize_port_id(port_id):
@@ -61,14 +84,75 @@ def _humanize_slot_label(time_slot):
     return f'{start_label}–{end_label}'
 
 
+def _slot_start_datetime(booking_date_str, time_slot):
+    booking_date = _parse_booking_date(booking_date_str)
+    slot_start, _ = _parse_slot_range(time_slot)
+    if not booking_date or not slot_start:
+        return None
+    return datetime.combine(booking_date, slot_start)
+
+
 def _slot_has_ended(booking_date_str, time_slot, now_dt):
     booking_date = _parse_booking_date(booking_date_str)
-    _, slot_end = _parse_slot_range(time_slot)
-    if not booking_date or not slot_end:
+    slot_start, slot_end = _parse_slot_range(time_slot)
+    if not booking_date or not slot_start or not slot_end:
         return False
 
+    slot_start_dt = datetime.combine(booking_date, slot_start)
     slot_end_dt = datetime.combine(booking_date, slot_end)
+    # Handle slots that wrap over midnight (e.g., 23:00 - 00:00)
+    if slot_end_dt <= slot_start_dt:
+        slot_end_dt += timedelta(days=1)
+
     return slot_end_dt <= now_dt
+
+
+def _send_upcoming_booking_reminders(db, user_id=None):
+    now_dt = now_utc()
+    look_ahead = now_dt + timedelta(minutes=30)
+
+    query = {
+        'status': {'$in': ['confirmed', 'pending']},
+        'reminder_sent_30m': {'$ne': True},
+    }
+    if user_id is not None:
+        query['user_id'] = user_id
+
+    upcoming = list(db.bookings.find(query, {'_id': 1, 'user_id': 1, 'station_id': 1, 'date': 1, 'time_slot': 1}))
+    if not upcoming:
+        return
+
+    station_ids = {
+        booking.get('station_id')
+        for booking in upcoming
+        if booking.get('station_id') is not None
+    }
+    station_docs = list(db.stations.find({'_id': {'$in': list(station_ids)}}, {'_id': 1, 'name': 1})) if station_ids else []
+    station_name_map = {station['_id']: station.get('name') or 'Unknown Station' for station in station_docs}
+
+    reminder_ids = []
+    for booking in upcoming:
+        start_dt = _slot_start_datetime(booking.get('date'), booking.get('time_slot'))
+        if not start_dt:
+            continue
+
+        if now_dt <= start_dt <= look_ahead:
+            station_name = station_name_map.get(booking.get('station_id'), 'Unknown Station')
+            _create_notification(
+                db,
+                booking.get('user_id'),
+                'reminder',
+                'Booking Reminder',
+                f'Your charging slot starts in 30 minutes at {station_name}. Please arrive on time.',
+                '/user/bookings'
+            )
+            reminder_ids.append(booking.get('_id'))
+
+    if reminder_ids:
+        db.bookings.update_many(
+            {'_id': {'$in': reminder_ids}},
+            {'$set': {'reminder_sent_30m': True, 'updated_at': now_utc()}}
+        )
 
 
 def _ensure_booking_indexes(db):
@@ -188,6 +272,7 @@ def get_bookings():
         role = user.get('role')
 
         _refresh_elapsed_bookings(db)
+        _send_upcoming_booking_reminders(db, user.get('_id'))
 
         query = {}
         if role == 'user':
@@ -239,6 +324,8 @@ def create_booking():
         now_dt = now_utc()
         slot_start_dt = datetime.combine(requested_date, slot_start)
         slot_end_dt = datetime.combine(requested_date, slot_end)
+        if slot_end_dt <= slot_start_dt:
+            slot_end_dt += timedelta(days=1)
         if slot_end_dt <= now_dt:
             return jsonify({'success': False, 'error': 'Cannot book a slot that has already ended'}), 400
 
@@ -276,6 +363,13 @@ def create_booking():
                 selected_port = port
                 break
 
+        if not selected_port:
+            return jsonify({'success': False, 'error': 'Selected port not found'}), 404
+
+        valid_slots = _generate_time_slots(selected_port.get('type', 'normal'))
+        if data.get('timeSlot') not in valid_slots:
+            return jsonify({'success': False, 'error': 'Invalid time slot for selected charger type'}), 400
+
         projection = calculate_charging_projection(
             battery_capacity_kwh=data.get('batteryCapacity', 60),
             current_percentage=data.get('batteryStart', 20),
@@ -298,9 +392,11 @@ def create_booking():
         )
         booking.created_at = now_utc()
         booking.updated_at = now_utc()
+        booking_dict_for_insert = booking.to_dict()
+        booking_dict_for_insert['reminder_sent_30m'] = False
 
         try:
-            result = db.bookings.insert_one(booking.to_dict())
+            result = db.bookings.insert_one(booking_dict_for_insert)
         except DuplicateKeyError:
             return jsonify({'success': False, 'error': 'Time slot is already booked'}), 400
 
@@ -415,6 +511,8 @@ def get_available_slots():
         station_id = request.args.get('stationId')
         date = request.args.get('date')
         port_id = request.args.get('portId')
+        charging_mode = str(request.args.get('chargingMode') or '').strip().lower()
+        charger_type_hint = request.args.get('chargerType')
         
         if not station_id or not date:
             return jsonify({'success': False, 'error': 'stationId and date are required'}), 400
@@ -423,14 +521,35 @@ def get_available_slots():
         if not station_oid:
             return jsonify({'success': False, 'error': 'Invalid stationId'}), 400
 
-        _ensure_booking_indexes(db)
+        station = db.stations.find_one({'_id': station_oid}, {'ports': 1})
+        if not station:
+            return jsonify({'success': False, 'error': 'Station not found'}), 404
+
+        selected_port = None
         normalized_port_id = _normalize_port_id(port_id)
+        if normalized_port_id is not None:
+            for port in station.get('ports', []):
+                if _normalize_port_id(port.get('id')) == normalized_port_id:
+                    selected_port = port
+                    break
+
+        selected_type = (selected_port or {}).get('type', 'normal')
+        if charging_mode == 'fast':
+            selected_type = 'fast'
+        elif charging_mode == 'normal':
+            selected_type = 'normal'
+        elif charger_type_hint:
+            selected_type = charger_type_hint
+        time_slots = _generate_time_slots(selected_type)
+
+        _ensure_booking_indexes(db)
         _refresh_elapsed_bookings(
             db,
             station_id=station_oid,
             date=date,
             port_id=normalized_port_id
         )
+        _send_upcoming_booking_reminders(db)
         
         # Find booked slots
         query = {
@@ -450,7 +569,7 @@ def get_available_slots():
                 'status': 'booked' if slot in booked_slots else 'available',
                 'isBooked': slot in booked_slots,
             }
-            for slot in AVAILABLE_TIME_SLOTS
+            for slot in time_slots
         ]
         available = [entry['slot'] for entry in slot_statuses if entry['status'] == 'available']
 
@@ -475,6 +594,7 @@ def get_station_bookings(station_id):
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
         _refresh_elapsed_bookings(db, station_id=station_oid)
+        _send_upcoming_booking_reminders(db)
 
         bookings_data = list(db.bookings.find({'station_id': station_oid}).sort('created_at', -1))
         bookings = _serialize_bookings(bookings_data, db)

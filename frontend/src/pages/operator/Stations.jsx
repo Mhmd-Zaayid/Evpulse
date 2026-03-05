@@ -285,8 +285,16 @@ const Stations = () => {
   const handleTogglePort = async (stationId, portId, currentStatus) => {
     const newStatus = currentStatus === 'available' ? 'offline' : 'available';
     try {
-      await operatorAPI.updatePortStatus(stationId, portId, newStatus);
-      showToast({ type: 'success', message: `Port ${newStatus === 'available' ? 'enabled' : 'disabled'}` });
+      const response = await operatorAPI.updatePortStatus(stationId, portId, newStatus);
+      if (!response?.success) {
+        showToast({ type: 'error', message: response?.error || 'Failed to update port status' });
+        return;
+      }
+      if (newStatus === 'offline') {
+        showToast({ type: 'warning', title: 'Maintenance', message: 'Maintenance: Port Disabled' });
+      } else {
+        showToast({ type: 'success', message: 'Port enabled' });
+      }
       fetchStations();
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to update port status' });
@@ -325,7 +333,7 @@ const Stations = () => {
       {filteredStations.length > 0 ? (
         <div className="space-y-6">
           {filteredStations.map((station) => (
-            <div key={station.id} className="card">
+            <div key={station.id} className="card border-2 border-green-500 rounded-xl shadow-md">
               {/* Station Header */}
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-4 border-b border-secondary-100">
                 <div className="flex items-start gap-4">
@@ -386,24 +394,24 @@ const Stations = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {station.pricing.normal && (
                     <>
-                      <div className="p-3 bg-secondary-50 rounded-lg">
-                        <p className="text-xs text-secondary-500">Normal (Base)</p>
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <p className="text-xs text-emerald-700">Normal (Base)</p>
                         <p className="font-semibold text-secondary-900">{formatCurrency(station.pricing.normal.base)}/kWh</p>
                       </div>
-                      <div className="p-3 bg-secondary-50 rounded-lg">
-                        <p className="text-xs text-secondary-500">Normal (Peak)</p>
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <p className="text-xs text-emerald-700">Normal (Peak)</p>
                         <p className="font-semibold text-secondary-900">{formatCurrency(station.pricing.normal.peak)}/kWh</p>
                       </div>
                     </>
                   )}
                   {station.pricing.fast && (
                     <>
-                      <div className="p-3 bg-primary-50 rounded-lg">
-                        <p className="text-xs text-primary-600">Fast (Base)</p>
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700">Fast (Base)</p>
                         <p className="font-semibold text-secondary-900">{formatCurrency(station.pricing.fast.base)}/kWh</p>
                       </div>
-                      <div className="p-3 bg-primary-50 rounded-lg">
-                        <p className="text-xs text-primary-600">Fast (Peak)</p>
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700">Fast (Peak)</p>
                         <p className="font-semibold text-secondary-900">{formatCurrency(station.pricing.fast.peak)}/kWh</p>
                       </div>
                     </>
@@ -420,13 +428,20 @@ const Stations = () => {
               <div className="pt-4">
                 <h4 className="text-sm font-medium text-secondary-700 mb-3">Charging Ports</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {station.ports.map((port) => (
+                  {station.ports.map((port) => {
+                    const isFastPort = String(port.type || '').toLowerCase().includes('fast') || String(port.type || '').toLowerCase().includes('dc');
+                    const chargingLabel = isFastPort ? 'Fast Charging' : 'Normal Charging';
+                    return (
                     <div
                       key={port.id}
                       className={`p-4 rounded-xl border-2 ${
-                        port.status === 'available' ? 'border-green-200 bg-green-50' :
-                        port.status === 'busy' ? 'border-amber-200 bg-amber-50' :
-                        'border-secondary-200 bg-secondary-50'
+                        port.status === 'available'
+                          ? isFastPort
+                            ? 'border-blue-300 bg-blue-50/70'
+                            : 'border-emerald-400 bg-emerald-100/75'
+                          : port.status === 'busy'
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'border-secondary-300 bg-secondary-50'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -438,7 +453,10 @@ const Stations = () => {
                           {getStatusText(port.status)}
                         </Badge>
                       </div>
-                      <p className="text-sm text-secondary-600">{port.type}</p>
+                      <p className={`text-sm font-medium flex items-center gap-1 ${isFastPort ? 'text-blue-800' : 'text-emerald-800'}`}>
+                        {chargingLabel}
+                        {isFastPort && <Zap className="w-3.5 h-3.5" />}
+                      </p>
                       <p className="text-sm text-secondary-600">{port.power}kW • {formatCurrency(port.price)}/kWh</p>
                       <div className="mt-3 flex gap-2">
                         <Button
@@ -451,7 +469,8 @@ const Stations = () => {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -594,8 +613,16 @@ const Stations = () => {
             </div>
           </div>
 
-          <div>
-            <h4 className="font-medium text-secondary-900 mb-3">Fast DC Charging</h4>
+          <div className="rounded-2xl border-2 border-blue-300 bg-blue-50/70 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-blue-700" />
+              </div>
+              <h4 className="font-semibold text-blue-900 flex items-center gap-1">
+                Fast DC Charging
+                <Zap className="w-4 h-4" />
+              </h4>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Base Rate (₹/kWh)"

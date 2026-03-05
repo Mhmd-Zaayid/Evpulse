@@ -46,7 +46,7 @@ const Landing = () => {
                   <div className="text-white">Charge Smarter</div>
                   <div style={{ color: '#c8ff00' }}>Drive Farther</div>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-2xl mx-auto lg:mx-0">
+                <p className="text-xl text-gray-300 leading-relaxed max-w-xl mx-auto lg:mx-0 text-center lg:text-left self-center lg:self-start">
                   Powering smarter EV charging with one intelligent platform
                 </p>
               </div>
@@ -88,7 +88,7 @@ const Landing = () => {
                 <Battery className="w-7 h-7" style={{ color: '#c8ff00' }} />
                 <span className="text-xl font-bold text-white">EVPulse</span>
               </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
+              <p className="text-gray-400 text-sm leading-relaxed text-left max-w-xs">
                 Powering smarter EV charging with one intelligent platform.
               </p>
             </div>

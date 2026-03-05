@@ -230,11 +230,17 @@ export const bookingsAPI = {
     }
   },
 
-  async getAvailableSlots(stationId, date, portId) {
+  async getAvailableSlots(stationId, date, portId, chargingMode, chargerType) {
     try {
       const params = new URLSearchParams({ stationId, date });
       if (portId !== undefined && portId !== null) {
         params.append('portId', portId);
+      }
+      if (chargingMode) {
+        params.append('chargingMode', chargingMode);
+      }
+      if (chargerType) {
+        params.append('chargerType', chargerType);
       }
       return await apiRequest(`/bookings/available-slots?${params.toString()}`);
     } catch (error) {

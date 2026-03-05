@@ -234,7 +234,7 @@ const Dashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Vehicle Info Card */}
           {user?.vehicle && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-secondary-100">
+            <div className="bg-white rounded-2xl shadow-sm p-6 border-2 border-red-400">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-secondary-900">Your Vehicle</h2>
                 <Button variant="outline" size="sm" onClick={() => navigate('/user/settings')}>
@@ -326,10 +326,10 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          session.chargingType === 'Fast DC' ? 'bg-amber-100' : 'bg-blue-100'
+                          session.chargingType === 'Fast DC' ? 'bg-blue-100' : 'bg-emerald-100'
                         }`}>
                           <Zap className={`w-6 h-6 ${
-                            session.chargingType === 'Fast DC' ? 'text-amber-600' : 'text-blue-600'
+                            session.chargingType === 'Fast DC' ? 'text-blue-600' : 'text-emerald-600'
                           }`} />
                         </div>
                         <div>

@@ -19,6 +19,7 @@ import { Button } from '../../components';
 
 const HelpSupport = () => {
   const [expandedFaq, setExpandedFaq] = useState(null);
+  const [expandedGuide, setExpandedGuide] = useState(null);
 
   const faqs = [
     {
@@ -141,28 +142,36 @@ const HelpSupport = () => {
     {
       icon: Zap,
       title: 'First Time Charging',
-      description: 'Step-by-step guide for your first charge'
+      description: 'Step-by-step guide for your first charge',
+      steps: ['Find a nearby station', 'Connect charging gun securely', 'Tap Start Charging', 'Monitor battery progress']
     },
     {
       icon: CreditCard,
       title: 'Payment Setup',
-      description: 'How to add and manage payment methods'
+      description: 'How to add and manage payment methods',
+      steps: ['Open Settings > Payments', 'Add card or wallet', 'Set preferred payment method', 'Enable wallet top-up alerts']
     },
     {
       icon: Calendar,
       title: 'Booking Guide',
-      description: 'Learn how to reserve charging slots'
+      description: 'Learn how to reserve charging slots',
+      steps: ['Choose station and port', 'Select date and time slot', 'Review estimated cost', 'Confirm booking']
     },
     {
       icon: MapPin,
       title: 'Finding Stations',
-      description: 'Tips for finding the best stations'
+      description: 'Tips for finding the best stations',
+      steps: ['Use city/location search', 'Filter by charger type', 'Check live port status', 'Compare pricing and amenities']
     }
   ];
 
   const toggleFaq = (categoryIndex, questionIndex) => {
     const key = `${categoryIndex}-${questionIndex}`;
     setExpandedFaq(expandedFaq === key ? null : key);
+  };
+
+  const toggleGuide = (guideIndex) => {
+    setExpandedGuide(expandedGuide === guideIndex ? null : guideIndex);
   };
 
   return (
@@ -198,16 +207,36 @@ const HelpSupport = () => {
           <FileText className="w-5 h-5 text-primary-500" />
           Quick Guides
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
           {quickGuides.map((guide, index) => (
-            <button
-              key={index}
-              className="p-4 bg-secondary-50 rounded-xl hover:bg-primary-50 transition-colors text-left group"
-            >
-              <guide.icon className="w-8 h-8 text-primary-500 mb-2" />
-              <h4 className="font-medium text-secondary-900 group-hover:text-primary-700">{guide.title}</h4>
-              <p className="text-sm text-secondary-500 mt-1">{guide.description}</p>
-            </button>
+            <div key={index} className="self-start p-4 bg-secondary-50 rounded-xl hover:bg-primary-50 transition-colors text-left group h-fit">
+              <button
+                className="w-full"
+                onClick={() => toggleGuide(index)}
+                type="button"
+              >
+                <guide.icon className="w-8 h-8 text-primary-500 mb-2" />
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-medium text-secondary-900 group-hover:text-primary-700">{guide.title}</h4>
+                  {expandedGuide === index ? (
+                    <ChevronUp className="w-4 h-4 text-primary-500 mt-0.5" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-secondary-400 mt-0.5" />
+                  )}
+                </div>
+                <p className="text-sm text-secondary-500 mt-1">{guide.description}</p>
+              </button>
+              {expandedGuide === index && (
+                <div className="mt-3 pt-3 border-t border-secondary-200">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Quick Steps</p>
+                  <ul className="space-y-1.5">
+                    {guide.steps.map((step) => (
+                      <li key={step} className="text-xs text-secondary-700">- {step}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

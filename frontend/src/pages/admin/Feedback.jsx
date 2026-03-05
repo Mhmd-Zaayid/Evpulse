@@ -72,6 +72,18 @@ const Feedback = () => {
     return formatDate(review?.date || review?.createdAt || review?.timestamp || null);
   };
 
+  const getChargingBadgeClass = (chargerType) => {
+    const isFast = String(chargerType || '').toLowerCase().includes('fast') || String(chargerType || '').toLowerCase().includes('dc');
+    return isFast
+      ? 'bg-blue-50 text-blue-700 border-blue-200'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  };
+
+  const getChargingLabel = (chargerType) => {
+    const isFast = String(chargerType || '').toLowerCase().includes('fast') || String(chargerType || '').toLowerCase().includes('dc');
+    return isFast ? 'Fast Charging' : 'Normal Charging';
+  };
+
   const filteredReviews = feedbackData?.reviews?.filter(review => {
     const matchesRating = filter === 'all' || 
       (filter === 'positive' && review.rating >= 4) ||
@@ -270,6 +282,14 @@ const Feedback = () => {
                         <Calendar className="h-4 w-4" />
                         <span>{getDisplayDate(review)}</span>
                       </div>
+                      {review.chargerType && (
+                        <div className="flex items-center gap-1">
+                          <Zap className="h-4 w-4" />
+                          <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${getChargingBadgeClass(review.chargerType)}`}>
+                            {getChargingLabel(review.chargerType)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -326,6 +346,12 @@ const Feedback = () => {
               <div>
                 <p className="text-gray-500">Review</p>
                 <p className="font-medium">Submitted</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Charging Type</p>
+                <p className={`inline-flex mt-1 px-2 py-0.5 rounded-full border text-xs font-medium ${getChargingBadgeClass(selectedReview.chargerType)}`}>
+                  {getChargingLabel(selectedReview.chargerType)}
+                </p>
               </div>
             </div>
             

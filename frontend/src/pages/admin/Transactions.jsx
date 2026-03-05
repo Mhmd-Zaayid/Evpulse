@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNotifications } from '../../context';
 import { adminAPI } from '../../services';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils';
-import { Button, Input, Select, Table, Badge, EmptyState, LoadingSpinner } from '../../components';
+import { Button, Input, Select, Table, Badge, EmptyState, LoadingSpinner, Modal } from '../../components';
 import {
   Receipt,
   Search,
@@ -27,6 +27,8 @@ const Transactions = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateRange, setDateRange] = useState('all');
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -90,6 +92,11 @@ const Transactions = () => {
 
   const handleExport = () => {
     showToast({ type: 'success', message: 'Transaction report exported successfully!' });
+  };
+
+  const handleViewTransaction = (txn) => {
+    setSelectedTransaction(txn);
+    setShowDetailModal(true);
   };
 
   const handleRefund = async (txn) => {
@@ -204,6 +211,7 @@ const Transactions = () => {
       render: (_, row) => (
         <div className="flex items-center gap-2">
           <button
+            onClick={() => handleViewTransaction(row)}
             className="p-2 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
             title="View Details"
           >
@@ -368,6 +376,64 @@ const Transactions = () => {
           description="Try adjusting your search or filters"
         />
       )}
+
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="Transaction Details"
+        size="md"
+      >
+        {selectedTransaction && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+              <div>
+                <p className="text-gray-500">Transaction ID</p>
+                <p className="font-medium break-all">{selectedTransaction.id}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Status</p>
+                <p className="font-medium capitalize">{selectedTransaction.status}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">User</p>
+                <p className="font-medium">{selectedTransaction.userName}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">User ID</p>
+                <p className="font-medium">{selectedTransaction.userId}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Type</p>
+                <p className="font-medium capitalize">{selectedTransaction.type}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Amount</p>
+                <p className="font-semibold text-green-700">{formatCurrency(selectedTransaction.amount || 0)}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Payment Method</p>
+                <p className="font-medium">{selectedTransaction.paymentMethod}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Session ID</p>
+                <p className="font-medium break-all">{selectedTransaction.sessionId || 'N/A'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-gray-500">Date & Time</p>
+                <p className="font-medium">{selectedTransaction.timestamp ? formatDateTime(selectedTransaction.timestamp) : 'N/A'}</p>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowDetailModal(false)}
+            >
+              Close
+            </Button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

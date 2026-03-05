@@ -60,7 +60,7 @@ class Station:
         station.nearby_landmark = data.get('nearby_landmark') or data.get('nearbyLandmark') or data.get('address')
         station.city = data.get('city')
         station.coordinates = data.get('coordinates', {})
-        station.operator_id = data.get('operator_id')
+        station.operator_id = data.get('operator_id') or data.get('operatorId')
         station.status = data.get('status', 'available')
         station.rating = data.get('rating', 0.0)
         station.total_reviews = data.get('total_reviews', 0)

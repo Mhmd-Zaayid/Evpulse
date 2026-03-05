@@ -174,6 +174,14 @@ def get_admin_stats():
         ])
         active_chargers_count = list(active_chargers)
         active_chargers_count = active_chargers_count[0]['total'] if active_chargers_count else 0
+
+        total_ports_cursor = db.stations.aggregate([
+            {'$unwind': '$ports'},
+            {'$count': 'total'}
+        ])
+        total_ports_result = list(total_ports_cursor)
+        total_ports_count = total_ports_result[0]['total'] if total_ports_result else 0
+        offline_ports_count = max(total_ports_count - active_chargers_count, 0)
         
         # Calculate revenue
         transactions = list(db.transactions.find({'type': 'charging', 'status': 'completed'}))
@@ -337,6 +345,9 @@ def get_admin_stats():
             'totalStations': total_stations,
             'totalRevenue': total_revenue,
             'activeChargers': active_chargers_count,
+            'onlinePorts': active_chargers_count,
+            'offlinePorts': offline_ports_count,
+            'totalPorts': total_ports_count,
             'totalEnergy': total_energy,
             'monthlyGrowth': {
                 'users': round(user_growth, 1),
@@ -516,6 +527,42 @@ def get_all_users():
         
         users_data = list(db.users.find(query))
         users = [User.from_dict(data).to_safe_dict() for data in users_data]
+
+        user_ids = [data.get('_id') for data in users_data if data.get('_id')]
+        user_session_counts = {}
+        user_spend_map = {}
+
+        if user_ids:
+            user_id_strings = [str(uid) for uid in user_ids]
+            user_id_match_values = user_ids + user_id_strings
+            sessions_by_user = list(db.sessions.aggregate([
+                {'$match': {'user_id': {'$in': user_id_match_values}}},
+                {'$group': {'_id': '$user_id', 'count': {'$sum': 1}}}
+            ]))
+            user_session_counts = {
+                str(item.get('_id')): int(item.get('count', 0))
+                for item in sessions_by_user
+            }
+
+            spend_by_user = list(db.transactions.aggregate([
+                {
+                    '$match': {
+                        'user_id': {'$in': user_id_match_values},
+                        'type': 'charging',
+                        'status': 'completed'
+                    }
+                },
+                {'$group': {'_id': '$user_id', 'total': {'$sum': '$amount'}}}
+            ]))
+            user_spend_map = {
+                str(item.get('_id')): _to_amount(item.get('total'))
+                for item in spend_by_user
+            }
+
+        for user in users:
+            user_id = user.get('id')
+            user['totalSessions'] = int(user_session_counts.get(user_id, 0))
+            user['totalSpent'] = _to_amount(user_spend_map.get(user_id, 0))
         
         return jsonify({'success': True, 'data': users})
     except Exception as e:

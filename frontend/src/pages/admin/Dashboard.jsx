@@ -118,8 +118,8 @@ const Dashboard = () => {
   }));
 
   const stationStatusData = [
-    { name: 'Online', value: stats?.activeChargers || 0, color: '#22c55e' },
-    { name: 'Offline', value: Math.max((stats?.totalStations || 0) - (stats?.activeChargers || 0), 0), color: '#ef4444' },
+    { name: 'Online', value: stats?.onlinePorts ?? stats?.activeChargers ?? 0, color: '#22c55e' },
+    { name: 'Offline', value: stats?.offlinePorts ?? 0, color: '#ef4444' },
   ];
 
   const topRegions = (stats?.stationsByCity || []).map((item) => ({

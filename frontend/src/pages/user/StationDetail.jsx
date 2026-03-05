@@ -58,6 +58,7 @@ const StationDetail = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
   const [chargingProgress, setChargingProgress] = useState(0);
+  const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [existingActiveSession, setExistingActiveSession] = useState(null);
   
@@ -84,16 +85,23 @@ const StationDetail = () => {
     chargingMode: 'normal',
   });
   const [availableSlots, setAvailableSlots] = useState([]);
+  const isFastSelectedPort = String(selectedPort?.type || '').toLowerCase().includes('fast') || String(selectedPort?.type || '').toLowerCase().includes('dc');
+  const selectedChargingMethodLabel = selectedPort ? (isFastSelectedPort ? 'Fast Charging' : 'Normal Charging') : 'Not selected';
   const percentageToCharge = Math.max(0, Number(targetBattery || 0) - Number(currentBattery || 0));
-  const totalTimeFor100 = 60;
-  const scaledDurationMinutes = (percentageToCharge / 100) * totalTimeFor100;
-  const projectedDurationMinutes = percentageToCharge >= 100
-    ? Math.min(60, Math.max(45, scaledDurationMinutes || totalTimeFor100))
-    : Math.max(1, scaledDurationMinutes);
+  const fullChargeMinutesByMode = isFastSelectedPort ? 35 : 60;
+  const scaledDurationMinutes = (percentageToCharge / 100) * fullChargeMinutesByMode;
+  const projectedDurationMinutes = Math.max(1, Math.round(scaledDurationMinutes || fullChargeMinutesByMode));
 
   useEffect(() => {
     fetchStationDetails();
     fetchReviews();
+  }, [id]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchStationDetails();
+    }, 20000);
+    return () => clearInterval(timer);
   }, [id]);
 
   useEffect(() => {
@@ -227,12 +235,18 @@ const StationDetail = () => {
   // AI optimization (neutral naming)
   const fetchAiOptimization = useCallback(async () => {
     if (!station) return;
+    if (!selectedPort) {
+      setAiReport(null);
+      setAiProjection(null);
+      setAiError('Please select an available charging port before running AI analysis.');
+      return;
+    }
 
     setAiLoading(true);
     setAiError(null);
 
-    // Determine charger info from selected port or first available
-    const port = selectedPort || station.ports.find(p => p.status === 'available') || station.ports[0];
+    // AI report should strictly reflect the user-selected charging method/port.
+    const port = selectedPort;
     const chargerType = port?.type?.includes('DC') ? 'Fast' : 'Normal';
     const chargerPower = port?.power || 22;
     const costPerKwh = Number(port?.price ?? 8);
@@ -282,7 +296,14 @@ const StationDetail = () => {
   const handlePortSelect = (port) => {
     if (port.status === 'available') {
       setSelectedPort(port);
+      const isFastPort = String(port.type || '').toLowerCase().includes('fast') || String(port.type || '').toLowerCase().includes('dc');
+      setBookingData((prev) => ({ ...prev, chargingMode: isFastPort ? 'fast' : 'normal', timeSlot: '' }));
     }
+  };
+
+  const getChargingTypeLabel = (type) => {
+    const normalized = String(type || '').toLowerCase();
+    return normalized.includes('fast') || normalized.includes('dc') ? 'Fast Charging' : 'Normal Charging';
   };
 
   const handleBookSlot = async () => {
@@ -365,6 +386,7 @@ const StationDetail = () => {
       setIsCharging(true);
       setShowChargingModal(true);
       setChargingProgress(0);
+      await fetchStationDetails();
       showToast({ type: 'success', message: response.message || 'Charging session started successfully.' });
     } catch (error) {
       showToast({ type: 'error', message: 'Failed to start charging session' });
@@ -394,6 +416,7 @@ const StationDetail = () => {
       setActiveSessionId(null);
       setExistingActiveSession(null);
       await fetchWalletBalance();
+      await fetchStationDetails();
       showToast({ type: 'success', message: 'Charging session completed!' });
       setTimeout(() => setShowRatingModal(true), 500);
     } catch (error) {
@@ -415,7 +438,7 @@ const StationDetail = () => {
   };
 
   const fetchAvailableSlots = async (date) => {
-    const response = await bookingsAPI.getAvailableSlots(id, date, selectedPort?.id);
+    const response = await bookingsAPI.getAvailableSlots(id, date, selectedPort?.id, bookingData.chargingMode, selectedPort?.type);
     const slots = response?.data || [];
     const normalizedSlots = slots.map((entry) => {
       if (typeof entry === 'string') {
@@ -440,7 +463,7 @@ const StationDetail = () => {
     if (bookingData.date && showBookingModal) {
       fetchAvailableSlots(bookingData.date);
     }
-  }, [selectedPort?.id, bookingData.date, showBookingModal]);
+  }, [selectedPort?.id, bookingData.date, bookingData.chargingMode, showBookingModal]);
 
   const getAmenityIcon = (amenity) => {
     const icons = {
@@ -554,6 +577,48 @@ const StationDetail = () => {
       })
     : 'N/A';
   const displayAddress = formatStationAddress(station);
+  const operatorContact = {
+    name: station?.operatorName || 'Operator',
+    email: station?.operatorEmail || 'Not provided',
+    phone: station?.operatorPhone || 'Not provided',
+  };
+  const stationTodayStats = {
+    totalSessions: Number(station?.totalSessionsToday || station?.todaySessions || 0),
+    energyDelivered: Number(station?.energyDeliveredToday || station?.todayEnergy || 0),
+    vehiclesCharged: Number(station?.vehiclesChargedToday || station?.todayVehicles || 0),
+    utilizationPercent: Number(station?.utilizationPercent || 0),
+  };
+  const todayDate = new Date().toISOString().split('T')[0];
+  const isTodayBooking = bookingData.date === todayDate;
+
+  const parseSlotStartMinutes = (slotLabel) => {
+    if (!slotLabel || typeof slotLabel !== 'string') {
+      return null;
+    }
+
+    const timePartMatch = slotLabel.match(/(\d{1,2}:\d{2})(?:\s*([AaPp][Mm]))?/);
+    if (!timePartMatch) {
+      return null;
+    }
+
+    const [hoursText, minutesText] = timePartMatch[1].split(':');
+    let hours = Number(hoursText);
+    const minutes = Number(minutesText);
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return null;
+    }
+
+    const meridian = timePartMatch[2]?.toUpperCase();
+    if (meridian === 'PM' && hours < 12) {
+      hours += 12;
+    }
+    if (meridian === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    return (hours * 60) + minutes;
+  };
 
   return (
     <div className="space-y-6">
@@ -630,18 +695,38 @@ const StationDetail = () => {
                   <div>
                     <h2 className="text-xl font-bold">AI Charging Optimization Report</h2>
                     <p className="text-sm text-white/85 mt-1">Smart, data-driven charging insights for faster and more cost-efficient sessions.</p>
+                    <div className="mt-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                          selectedPort
+                            ? isFastSelectedPort
+                              ? 'bg-blue-100/90 text-blue-800 border-blue-200'
+                              : 'bg-emerald-100/90 text-emerald-800 border-emerald-200'
+                            : 'bg-white/15 text-white border-white/30'
+                        }`}
+                      >
+                        Selected Method: {selectedChargingMethodLabel}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <button
                   onClick={fetchAiOptimization}
-                  disabled={aiLoading}
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-700 bg-white hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-50"
+                  disabled={aiLoading || !selectedPort}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-700 bg-white hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={`w-4 h-4 ${aiLoading ? 'animate-spin' : ''}`} />
                   {aiLoading ? 'Analyzing...' : aiReport ? 'Re-analyze' : 'Analyze'}
                 </button>
               </div>
             </div>
+
+            {!selectedPort && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">Select an available charging port first. AI estimates are generated from the selected charging method and port power.</p>
+              </div>
+            )}
 
             {/* Configuration Inputs */}
             <div className="mb-5 p-4 sm:p-5 rounded-2xl border border-secondary-200 bg-secondary-50/70">
@@ -801,6 +886,7 @@ const StationDetail = () => {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-2">Essential Inputs</p>
                       <ul className="space-y-2 text-sm text-secondary-700">
+                        <li className="flex items-center justify-between"><span>Charging method</span><strong className="text-secondary-900">{selectedChargingMethodLabel}</strong></li>
                         <li className="flex items-center justify-between"><span>Vehicle type</span><strong className="text-secondary-900">{vehicleType}</strong></li>
                         <li className="flex items-center justify-between"><span>Battery capacity</span><strong className="text-secondary-900">{batteryCapacity} kWh</strong></li>
                         <li className="flex items-center justify-between"><span>Current → Target</span><strong className="text-secondary-900">{currentBattery}% → {targetBattery}%</strong></li>
@@ -838,17 +924,25 @@ const StationDetail = () => {
           <div className="card">
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Available Charging Ports</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {station.ports.map((port) => (
+              {station.ports.map((port) => {
+                const isFastPort = String(port.type || '').toLowerCase().includes('fast') || String(port.type || '').toLowerCase().includes('dc');
+                return (
                 <button
                   key={port.id}
                   onClick={() => handlePortSelect(port)}
                   disabled={port.status !== 'available'}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     selectedPort?.id === port.id
-                      ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200'
+                      ? isFastPort
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200 shadow-sm'
+                        : 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200 shadow-sm'
                       : port.status === 'available'
-                        ? 'border-secondary-200 hover:border-primary-300 hover:bg-primary-50/50 cursor-pointer'
-                        : 'border-secondary-200 bg-secondary-50 opacity-60 cursor-not-allowed'
+                        ? isFastPort
+                          ? 'border-blue-300 bg-blue-50/70 hover:border-blue-500 hover:bg-blue-50 cursor-pointer shadow-sm'
+                          : 'border-emerald-400 bg-emerald-100/70 hover:border-emerald-600 hover:bg-emerald-100 cursor-pointer shadow-sm'
+                        : port.status === 'busy'
+                          ? 'border-amber-300 bg-amber-50 opacity-80 cursor-not-allowed'
+                          : 'border-red-300 bg-red-50/80 opacity-75 cursor-not-allowed'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -861,20 +955,24 @@ const StationDetail = () => {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm text-secondary-600">{port.type}</p>
+                    <p className={`text-sm font-medium flex items-center gap-1 ${isFastPort ? 'text-blue-700' : 'text-emerald-700'}`}>
+                      {getChargingTypeLabel(port.type)}
+                      {isFastPort && <Zap className="w-3.5 h-3.5" />}
+                    </p>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-secondary-500">{port.power}kW</span>
-                      <span className="text-sm font-medium text-primary-600">{formatCurrency(port.price)}/kWh</span>
+                      <span className={`text-sm font-medium ${isFastPort ? 'text-blue-600' : 'text-emerald-600'}`}>{formatCurrency(port.price)}/kWh</span>
                     </div>
                   </div>
                   {selectedPort?.id === port.id && (
-                    <div className="mt-2 flex items-center gap-1 text-primary-600">
+                    <div className={`mt-2 flex items-center gap-1 ${isFastPort ? 'text-blue-600' : 'text-emerald-600'}`}>
                       <Check className="w-4 h-4" />
                       <span className="text-xs font-medium">Selected</span>
                     </div>
                   )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -925,26 +1023,10 @@ const StationDetail = () => {
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Start Charging</h2>
             {selectedPort ? (
               <div className="space-y-4">
-                {existingActiveSession && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/user/history')}
-                    className="w-full text-left p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 hover:bg-red-100 transition-colors"
-                  >
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-red-700">
-                      <p className="font-medium">You already have an active charging session.</p>
-                      <p className="mt-1">Station: {activeSessionStationName}</p>
-                      <p>Port: {activeSessionPort ? `#${activeSessionPort}` : 'N/A'}</p>
-                      <p>Started: {activeSessionStartLabel}</p>
-                      <p className="font-medium mt-1">Tap to view session history</p>
-                    </div>
-                  </button>
-                )}
                 <div className="p-3 bg-primary-50 rounded-xl">
                   <p className="text-sm text-secondary-600">Selected Port</p>
                   <p className="font-medium text-secondary-900">
-                    Port #{selectedPort.id} • {selectedPort.type}
+                    Port #{selectedPort.id} • {getChargingTypeLabel(selectedPort.type)}
                   </p>
                 </div>
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
@@ -956,9 +1038,6 @@ const StationDetail = () => {
                   <p className={`text-base font-semibold ${isWalletBelowMinimum ? 'text-red-600' : 'text-green-600'}`}>
                     {walletLoading ? 'Checking...' : formatCurrency(walletBalanceValue)}
                   </p>
-                  {isWalletBelowMinimum && (
-                    <p className="text-sm text-red-600 mt-1">Minimum wallet balance must be ₹{MIN_WALLET_BALANCE} to start charging.</p>
-                  )}
                 </div>
                 <Button 
                   fullWidth 
@@ -985,18 +1064,80 @@ const StationDetail = () => {
           </div>
 
           {/* Amenities */}
-          <div className="card">
+          <div className="card border-2 border-emerald-300">
             <h2 className="text-lg font-semibold text-secondary-900 mb-4">Amenities</h2>
             <div className="grid grid-cols-2 gap-3">
               {displayAmenities.map((amenity) => {
                 const Icon = getAmenityIcon(amenity);
                 return (
-                  <div key={amenity} className="flex items-center gap-2 p-2 bg-secondary-50 rounded-lg">
+                  <div key={amenity} className="flex items-center gap-2 p-2 bg-emerald-50/60 border-2 border-emerald-200 rounded-lg">
                     <Icon className="w-4 h-4 text-secondary-500" />
                     <span className="text-sm text-secondary-700">{amenity}</span>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="card border-2 border-emerald-300">
+            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Operator Contact Details</h2>
+            <div className="space-y-3 text-sm">
+              <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                <p className="text-secondary-500">Operator Name</p>
+                <p className="font-semibold text-secondary-900">{operatorContact.name}</p>
+              </div>
+              <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                <p className="text-secondary-500">Email</p>
+                <p className="font-semibold text-secondary-900 break-all">{operatorContact.email}</p>
+              </div>
+              <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50">
+                <p className="text-secondary-500">Phone</p>
+                <p className="font-semibold text-secondary-900">{operatorContact.phone}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card border-2 border-emerald-300">
+            <h2 className="text-lg font-semibold text-secondary-900 mb-4">Station Statistics</h2>
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/60">
+                <p className="text-secondary-500">Total Sessions Today</p>
+                <p className="text-xl font-bold text-secondary-900">{stationTodayStats.totalSessions}</p>
+              </div>
+              <div className="p-3 rounded-xl border border-cyan-200 bg-cyan-50/60">
+                <p className="text-secondary-500">Energy Delivered Today (kWh)</p>
+                <p className="text-xl font-bold text-secondary-900">{stationTodayStats.energyDelivered}</p>
+              </div>
+              <div className="p-3 rounded-xl border border-violet-200 bg-violet-50/60">
+                <p className="text-secondary-500">Vehicles Charged Today</p>
+                <p className="text-xl font-bold text-secondary-900">{stationTodayStats.vehiclesCharged}</p>
+              </div>
+              <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/60">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-secondary-500">Port Utilization Today</p>
+                  <span className="text-sm font-semibold text-emerald-700">{stationTodayStats.utilizationPercent}%</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-emerald-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${Math.min(Math.max(stationTodayStats.utilizationPercent, 0), 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-secondary-500 mt-2">Tip: Visit during non-peak hours for shorter wait time and better charging efficiency.</p>
+              </div>
+              <div className="p-3 rounded-xl border border-indigo-200 bg-indigo-50/70">
+                <p className="text-secondary-500">Live Operations Snapshot</p>
+                <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                  <div className="rounded-lg bg-white/80 border border-indigo-100 p-2">
+                    <p className="text-secondary-500">Available Ports</p>
+                    <p className="font-semibold text-secondary-900">{availablePorts.length}/{station.ports.length}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/80 border border-indigo-100 p-2">
+                    <p className="text-secondary-500">Peak Hours</p>
+                    <p className="font-semibold text-secondary-900">{peakHoursLabel}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1028,24 +1169,28 @@ const StationDetail = () => {
                 {availableSlots.map((slotInfo) => {
                   const slot = slotInfo.slot;
                   const isBooked = Boolean(slotInfo.isBooked);
+                  const slotStartMinutes = parseSlotStartMinutes(slot);
+                  const isBeforeTodayCutoff = isTodayBooking && slotStartMinutes !== null && slotStartMinutes < (20 * 60);
+                  const isUnavailable = isBooked || isBeforeTodayCutoff;
                   const isSelected = bookingData.timeSlot === slot;
                   return (
                   <button
                     key={slot}
                     type="button"
-                    disabled={isBooked}
+                    disabled={isUnavailable}
                     onClick={() => {
-                      if (!isBooked) {
+                      if (!isUnavailable) {
                         setBookingData(prev => ({ ...prev, timeSlot: slot }));
                       }
                     }}
                     className={`p-2 text-sm rounded-lg border transition-colors ${
-                      isBooked
+                      isUnavailable
                         ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed opacity-90'
                         : isSelected
                           ? 'border-green-500 bg-green-50 text-green-700'
                           : 'border-green-200 bg-green-50 text-green-700 hover:border-green-400'
                     }`}
+                    title={isBeforeTodayCutoff ? 'Unavailable: slot is before 20:00 today' : undefined}
                   >
                     {slot}
                   </button>
@@ -1058,10 +1203,10 @@ const StationDetail = () => {
           <Select
             label="Charging Mode"
             value={bookingData.chargingMode}
-            onChange={(e) => setBookingData(prev => ({ ...prev, chargingMode: e.target.value }))}
+            onChange={(e) => setBookingData(prev => ({ ...prev, chargingMode: e.target.value, timeSlot: '' }))}
             options={[
               { value: 'normal', label: 'Normal Charging' },
-              { value: 'fast', label: 'Fast Charging' },
+              { value: 'fast', label: 'Fast Charging ⚡' },
             ]}
           />
 
@@ -1169,6 +1314,44 @@ const StationDetail = () => {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showAllReviewsModal}
+        onClose={() => setShowAllReviewsModal(false)}
+        title={`All Reviews (${reviews.length})`}
+        size="lg"
+      >
+        {reviews.length > 0 ? (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {reviews.map((review) => (
+              <div
+                key={review.id || review._id || `${review.userName}-${review.createdAt}`}
+                className="p-4 bg-secondary-50 rounded-xl"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-secondary-900">{review.userName || 'Anonymous User'}</p>
+                    <div className="flex mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${star <= review.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-secondary-500">
+                    {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
+                  </p>
+                </div>
+                {review.comment && <p className="text-sm text-secondary-700 mt-2">{review.comment}</p>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-secondary-500">No reviews available.</p>
+        )}
       </Modal>
 
       {/* Rating Modal */}
